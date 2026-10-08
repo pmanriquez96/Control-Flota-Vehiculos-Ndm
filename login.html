@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ingresar · Flota NDM</title><link rel="icon" type="image/png" href="/logo.png">
+<style>
+:root{--bg:#0a0d10;--card:#ffffff;--ink:#15212c;--muted:#556676;--line:#d2dae2;--accent:#0f5c9e;--bad:#a4261a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);padding:16px}
+main{width:100%;max-width:380px}
+.logo{display:block;width:100%;max-width:300px;margin:0 auto 20px}
+form{background:var(--card);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:14px}
+h1{font-size:20px;margin:0}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}
+input{font:inherit;color:var(--ink);padding:11px 12px;border:1px solid var(--line);border-radius:8px;min-height:46px}
+input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:700;min-height:48px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+button:disabled{opacity:.6}
+.err{color:var(--bad);font-size:14px;min-height:20px;margin:0}
+</style></head><body>
+<main>
+<img class="logo" src="/logo.png" alt="NDM Neumáticos del Maule">
+<form id="f" autocomplete="on">
+<h1>Registro de vehículos</h1>
+<label>Usuario<input id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" required></label>
+<label>Clave<input id="p" name="password" type="password" autocomplete="current-password" required></label>
+<p class="err" id="e" role="alert"></p>
+<button id="b" type="submit">Ingresar</button>
+</form>
+</main>
+<script>
+document.getElementById('f').addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var b=document.getElementById('b'),e=document.getElementById('e'); b.disabled=true; e.textContent='';
+  fetch('/api/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})})
+  .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+  .then(function(x){ if(x.ok){ location.href = x.j.role==='chofer' ? '/#checklist' : '/'; } else { e.textContent=x.j.error||'No se pudo ingresar'; b.disabled=false; } },
+        function(){ e.textContent='Sin conexión con el servidor'; b.disabled=false; });
+});
+</script></body></html>

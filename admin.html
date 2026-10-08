@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Usuarios · Flota NDM</title><link rel="icon" type="image/png" href="/logo.png">
+<style>
+:root{--bg:#eceff3;--card:#fff;--ink:#15212c;--muted:#556676;--line:#d2dae2;--accent:#0f5c9e;--bad:#a4261a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+header{background:#0a0d10;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between}
+header img{height:42px}
+header a{color:#fff}
+main{max-width:860px;margin:18px auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{font-size:18px;margin:0 0 4px} p.hint{color:var(--muted);font-size:14px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}
+input,select{font:inherit;color:var(--ink);padding:9px 10px;border:1px solid var(--line);border-radius:8px;min-height:42px;background:#fff}
+button{font:inherit;font-weight:600;min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+button.bad{color:var(--bad);border-color:var(--bad)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+ul{list-style:none;margin:0;padding:0} li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+li .who{flex:1;min-width:160px} li small{color:var(--muted)}
+#msg{min-height:22px;font-size:14px;margin:8px 0 0}
+.roles{font-size:14px;color:var(--muted)} .roles b{color:var(--ink)}
+</style></head><body>
+<header><img src="/logo.png" alt="NDM"><div><a href="/">← Volver a la página</a></div></header>
+<main>
+<section>
+<h2>Roles</h2>
+<p class="roles"><b>Administrador:</b> todo, y maneja usuarios. <b>Editor:</b> edita todos los datos. <b>Chofer:</b> registra kilometraje y checklist (con fotos) y puede dejar pendientes; no edita ni borra lo demás.</p>
+</section>
+<section>
+<h2>Nuevo usuario</h2><p class="hint">El usuario son letras minúsculas, números, punto o guion. La clave debe tener al menos 8 caracteres.</p>
+<form id="nf" class="grid" autocomplete="off">
+<label>Nombre<input id="n" required></label>
+<label>Usuario<input id="u" required autocapitalize="none"></label>
+<label>Clave<input id="p" type="text" minlength="8" required></label>
+<label>Rol<select id="r"><option value="chofer">Chofer</option><option value="editor">Editor</option><option value="admin">Administrador</option></select></label>
+<button class="pri" type="submit">Crear usuario</button>
+</form>
+<p id="msg" role="status"></p>
+</section>
+<section><h2>Usuarios</h2><ul id="list"></ul></section>
+</main>
+<script>
+var ROLE={admin:'Administrador',editor:'Editor',chofer:'Chofer'};
+function api(m,u,b){return fetch(u,{method:m,credentials:'same-origin',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined}).then(function(r){if(r.status===401){location.href='/login.html'}return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Error');return j})})}
+function say(t,bad){var e=document.getElementById('msg');e.textContent=t;e.style.color=bad?'#a4261a':'#1b6b3a'}
+function load(){api('GET','/api/users').then(function(us){
+  var ul=document.getElementById('list'); ul.innerHTML='';
+  us.forEach(function(u){
+    var li=document.createElement('li');
+    var w=document.createElement('div');w.className='who';w.innerHTML='<b></b><br><small></small>';w.querySelector('b').textContent=u.name;w.querySelector('small').textContent=u.username;
+    var sel=document.createElement('select');['chofer','editor','admin'].forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=ROLE[r];if(r===u.role)o.selected=true;sel.appendChild(o)});
+    sel.onchange=function(){api('PATCH','/api/users/'+encodeURIComponent(u.username),{role:sel.value}).then(function(){say('Rol actualizado')},function(e){say(e.message,1);load()})};
+    var pw=document.createElement('button');pw.textContent='Cambiar clave';
+    pw.onclick=function(){var n=prompt('Nueva clave para '+u.name+' (mínimo 8 caracteres)');if(!n)return;api('PATCH','/api/users/'+encodeURIComponent(u.username),{password:n}).then(function(){say('Clave cambiada')},function(e){say(e.message,1)})};
+    var del=document.createElement('button');del.className='bad';del.textContent='Borrar';
+    del.onclick=function(){if(!confirm('¿Borrar el usuario '+u.name+'?'))return;api('DELETE','/api/users/'+encodeURIComponent(u.username)).then(function(){say('Usuario borrado');load()},function(e){say(e.message,1)})};
+    li.append(w,sel,pw,del);ul.appendChild(li);
+  });
+},function(e){say(e.message,1)})}
+document.getElementById('nf').addEventListener('submit',function(ev){ev.preventDefault();
+  api('POST','/api/users',{name:n.value,username:u.value,password:p.value,role:r.value}).then(function(){say('Usuario creado');ev.target.reset();load()},function(e){say(e.message,1)})});
+load();
+</script></body></html>
