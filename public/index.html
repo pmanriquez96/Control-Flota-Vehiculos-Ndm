@@ -161,6 +161,7 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 #recent .rcl{max-height:300px;overflow-y:auto}
 @media (max-width:860px){.toprow{grid-template-columns:1fr}.toprow .kmbar form{grid-template-columns:1fr 1fr}.toprow .kmbar form .btn{grid-column:1/-1}}
 .gowrap{position:relative}
+#p-chk{scroll-margin-top:8px}
 .gomenu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:270px;max-width:88vw;max-height:70vh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
 .gomenu[hidden]{display:none}
 .gomenu .gh{font-size:12px;color:var(--muted);padding:6px 10px 4px}
@@ -1054,7 +1055,7 @@ document.addEventListener('click',function(e){
     case 'tab': ui.newVeh=null; ui.tab=b.dataset.tab; ui.edit=null; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
     case 'sel': selectVeh(id); render(true); break;
     case 'gomenu': toggleGoMenu(); break;
-    case 'gochk': closeGoMenu(); selectVeh(id); ui.tab='chk'; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
+    case 'gochk': closeGoMenu(); selectVeh(id); ui.tab='chk'; render(true); $('#p-chk').scrollIntoView({behavior:'smooth',block:'start'}); break;
     case 'chk-go': selectVeh(b.dataset.vid); ui.tab='chk'; ui.chkOpen=id; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
     case 'recent-more': ui.recentAll=!ui.recentAll; render(true); break;
     /* otros repuestos */
