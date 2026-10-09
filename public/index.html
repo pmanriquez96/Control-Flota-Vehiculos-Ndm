@@ -898,6 +898,12 @@ function updChkCount(){
   chkKeys().forEach(function(k){if(document.querySelector('input[name="r-'+k+'"]:checked'))done++});
   var e=$('#ck-count'); if(e) e.textContent=done+' de '+tot+' puntos revisados · lo que no aplique se deja sin marcar';
 }
+/* fotos de puntos que ya no están en el checklist (por ejemplo de versiones anteriores): se muestran igual */
+function otrasFotos(x){
+  var ks=Object.keys(x.fotos||{}).filter(function(k){return k!=='obs'&&!CHKNAME[k]});
+  if(!ks.length) return '';
+  return '<p class="fl" style="margin-top:8px">Otras fotos</p>'+ks.map(function(k){return fotosHtml(x,k)}).join('');
+}
 function renderChkList(){
   if(!chkBuilt) buildChkForm();
   var v=S.veh[ui.sel]; if(!v) return;
@@ -915,7 +921,7 @@ function renderChkList(){
     var open=ui.chkOpen===x.id, cf=ui.confirm==='chk'+x.id;
     var det='';
     if(open){
-      det='<div style="flex-basis:100%">'+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it);var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'+fotosHtml(x,it[0])}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+fotosHtml(x,'obs')+'</div>';
+      det='<div style="flex-basis:100%">'+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it)+fotosHtml(x,'ctab');var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'+fotosHtml(x,it[0])}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+fotosHtml(x,'obs')+otrasFotos(x)+'</div>';
     }
     return '<li><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
       (fails.length?pill({s:'bad'},fails.length+(fails.length===1?' malo':' malos')):'')+(regs.length?pill({s:'warn'},regs.length+(regs.length===1?' regular':' regulares')):'')+(!fails.length&&!regs.length&&answered>0?pill({s:'ok'},'Todo bueno'):'')+(sinrev>0?pill({s:'none'},sinrev+' sin revisar'):'')+(nfot?pill({s:'none'},nfot+(nfot===1?' foto':' fotos')):'')+
