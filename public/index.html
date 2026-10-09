@@ -472,7 +472,7 @@ function toast(msg,kind,undo){
   var d=document.createElement('div'); d.className='toast'+(kind==='bad'?' bad':''); d.setAttribute('role','status');
   d.appendChild(document.createTextNode(msg));
   if(undo){var b=document.createElement('button');b.textContent='Deshacer';b.onclick=function(){box.innerHTML='';undo()};d.appendChild(b)}
-  box.appendChild(d); clearTimeout(toast.t); toast.t=setTimeout(function(){box.innerHTML=''},undo?7000:3500);
+  box.appendChild(d); clearTimeout(toast.t); toast.t=setTimeout(function(){box.innerHTML=''},undo?7000:kind==='bad'?9000:3500);
 }
 function errMsg(e){
   if(e&&e.code==='permission_denied') return 'Tu usuario no tiene permiso para esta acción.';
