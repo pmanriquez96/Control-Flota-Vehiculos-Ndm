@@ -1,0 +1,17 @@
+{
+  "name": "Flota NDM",
+  "short_name": "Flota NDM",
+  "description": "Control de la flota de Neumáticos del Maule: kilometraje, mantenciones, papeles y checklist.",
+  "lang": "es-CL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0d10",
+  "theme_color": "#0a0d10",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -55,6 +55,13 @@ async function call(cookie, method, url, body) {
   ok(km1.entries.length === km0.entries.length + 1 && km1.entries[km1.entries.length - 1].km === 999999, 'se registró el kilometraje del checklist');
   const veh1 = (await call(A, 'GET', '/api/doc/vehicles/' + id)).j.data;
   ok(veh1.pending.length === (v.j[0].data.pending || []).length + 1, 'el punto malo pasó a pendientes');
+  const nKm = async () => (await call(A, 'GET', '/api/doc/kmlog/' + id)).j.data.entries.length;
+  const q1 = await call(C, 'POST', '/api/checklist', Object.assign({}, base, { clientId: 'q1abc2def3ghi', fotos: {}, pendientes: [] }));
+  const km1n = await nKm();
+  const q2 = await call(C, 'POST', '/api/checklist', Object.assign({}, base, { clientId: 'q1abc2def3ghi', fotos: {}, pendientes: [] }));
+  ok(q1.s === 200 && q2.s === 200 && q1.j.id === q2.j.id && q2.j.repetido === true, 'reenviar el mismo checklist (celular sin señal) no lo duplica');
+  ok((await nKm()) === km1n, 'el reenvío tampoco repite el kilometraje');
+  await call(A, 'DELETE', '/api/doc/checklists/' + q1.j.id);
   ok((await call(C, 'DELETE', '/api/doc/checklists/' + sv.j.id)).s === 403, 'chofer NO puede borrar checklists');
   // limpieza
   await call(A, 'DELETE', '/api/doc/checklists/' + sv.j.id);

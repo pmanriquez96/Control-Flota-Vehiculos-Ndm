@@ -4,14 +4,25 @@
   'use strict';
   window.NDM_SERVER = true;
 
+  /* Copia local de lo mínimo para abrir la página sin señal (vehículos, último km, nombres y usuario). */
+  var CACHEABLE = /^\/api\/(me|col\/(vehicles|kmlog)|doc\/settings\/personal)$/;
+  function cget(u) { try { var s = localStorage.getItem('ndm_c:' + u); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function cput(u, j) { try { var s = JSON.stringify(j); if (s.length < 1500000) localStorage.setItem('ndm_c:' + u, s); } catch (e) {} }
+  function cclear() { try { Object.keys(localStorage).filter(function (k) { return k.indexOf('ndm_c:') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {} }
+
   function api(method, url, body) {
     return fetch(url, {
       method: method, credentials: 'same-origin',
       headers: body ? { 'Content-Type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined
-    }).then(function (r) {
+    }).catch(function () { return null; }).then(function (r) {
+      if (!r) { // sin conexión: si hay copia local, se usa
+        var c = method === 'GET' && CACHEABLE.test(url) ? cget(url) : null;
+        if (c !== null) return c;
+        throw { code: 'unavailable', message: 'Sin conexión' };
+      }
       if (r.status === 401) { location.href = '/login.html'; return new Promise(function () {}); }
-      if (r.ok) return r.json();
+      if (r.ok) return r.json().then(function (j) { if (method === 'GET' && CACHEABLE.test(url)) cput(url, j); return j; });
       return r.json().catch(function () { return {}; }).then(function (j) {
         var code = r.status === 403 ? 'permission_denied' : r.status === 404 ? 'invalid_argument' : r.status === 413 ? 'quota_exceeded' : 'unavailable';
         throw { code: code, message: j.error || '' };
@@ -97,7 +108,7 @@
       bar.appendChild(span);
       if (me.role === 'admin') { var a = document.createElement('a'); a.href = '/admin.html'; a.textContent = 'Usuarios'; a.style.marginRight = '10px'; bar.appendChild(a); }
       var out = document.createElement('a'); out.href = '#'; out.textContent = 'Salir';
-      out.onclick = function (e) { e.preventDefault(); api('POST', '/api/logout').then(function () { location.href = '/login.html'; }); };
+      out.onclick = function (e) { e.preventDefault(); cclear(); api('POST', '/api/logout').then(function () { location.href = '/login.html'; }, function () { location.href = '/login.html'; }); };
       bar.appendChild(out);
       document.body.appendChild(bar);
     }, function () {});
