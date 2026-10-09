@@ -5,11 +5,13 @@ const express = require('express');
 const store = require('./lib/store');
 const auth = require('./lib/auth');
 const alerts = require('./lib/alerts');
+const checklist = require('./lib/checklist');
 const { seedIfEmpty } = require('./lib/seed');
 
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+app.use('/api/checklist', express.json({ limit: '25mb' })); // trae las fotos del checklist
 app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -68,13 +70,29 @@ function validate(req, res) {
   if (!auth.COLS.has(col) || !/^[\w.-]{1,80}$/.test(id || 'x')) { res.status(400).json({ error: 'Ruta inválida' }); return false; }
   return true;
 }
+/* El chofer solo lee lo mínimo para llenar el checklist: nombre y patente de los vehículos, su último
+   kilometraje y la lista de nombres. Nada más (ni papeles, ni historial, ni otros checklists). */
+function forChofer(col, id, data) {
+  if (col === 'vehicles') return { nombre: data.nombre, patente: data.patente, order: data.order };
+  if (col === 'kmlog') {
+    let last = null; ((data && data.entries) || []).forEach((x) => { if (!last || x.d >= last.d) last = x; });
+    return { entries: last ? [last] : [] };
+  }
+  if (col === 'settings' && id === 'personal') return data;
+  return undefined;
+}
 app.get('/api/col/:col', needUser, wrap(async (req, res) => {
   if (!auth.COLS.has(req.params.col)) return res.status(400).json({ error: 'Ruta inválida' });
-  res.json(await store.list(req.params.col));
+  const rows = await store.list(req.params.col);
+  if (req.user.role !== 'chofer') return res.json(rows);
+  res.json(rows.map((r) => ({ id: r.id, data: forChofer(req.params.col, r.id, r.data) })).filter((r) => r.data !== undefined));
 }));
 app.get('/api/doc/:col/:id', needUser, wrap(async (req, res) => {
   if (!validate(req, res)) return;
-  const d = await store.get(req.params.col, req.params.id);
+  const chofer = req.user.role === 'chofer';
+  if (chofer && forChofer(req.params.col, req.params.id, {}) === undefined) return res.status(403).json({ error: 'Sin permiso' });
+  let d = await store.get(req.params.col, req.params.id);
+  if (chofer && d != null) d = forChofer(req.params.col, req.params.id, d);
   if (d == null) return res.status(404).json({ error: 'No existe' });
   res.json({ data: d });
 }));
@@ -108,6 +126,17 @@ app.delete('/api/doc/:col/:id', needUser, wrap(async (req, res) => {
   await store.del(col, id); broadcast(col, id); res.json({ ok: true });
 }));
 
+/* Guardar un checklist completo (documento, fotos, kilometraje, pendientes y nombres). Lo puede usar cualquier rol. */
+app.post('/api/checklist', needUser, wrap(async (req, res) => {
+  try {
+    const r = await checklist.save(req.body, broadcast);
+    alerts.checkSoon(); res.json(Object.assign({ ok: true }, r));
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+}));
+
 app.get('/api/events', needUser, (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.flushHeaders();
@@ -120,16 +149,16 @@ app.get('/api/events', needUser, (req, res) => {
 /* ---------- alertas por correo ---------- */
 app.get('/api/alerts/status', needUser, needRole('admin', 'editor'), wrap(async (req, res) => {
   const { cfg, alerts: al } = await alerts.buildAlerts();
-  res.json({ mail: alerts.mailReady(), to: cfg.email || process.env.ALERT_EMAIL || '', active: al.length });
+  res.json({ mail: alerts.mailReady(), to: alerts.recipients(cfg).join(', '), active: al.length });
 }));
 app.post('/api/alerts/send', needUser, needRole('admin', 'editor'), wrap(async (req, res) => {
   const { cfg, alerts: al } = await alerts.buildAlerts();
-  const to = cfg.email || process.env.ALERT_EMAIL || '';
-  if (!to) return res.status(400).json({ error: 'Falta el correo que recibe las alertas (pestaña Alertas).' });
+  const to = alerts.recipients(cfg);
+  if (!to.length) return res.status(400).json({ error: 'Falta al menos un correo que reciba las alertas (pestaña Alertas).' });
   if (!alerts.mailReady()) return res.status(400).json({ error: 'El servidor aún no tiene configurado el envío de correo (variables SMTP_* en Railway).' });
   const m = alerts.message(al);
   try { await alerts.sendMail(to, m.subject, m.text); } catch (e) { return res.status(502).json({ error: 'No se pudo enviar: ' + e.message }); }
-  res.json({ ok: true, to, alerts: al.length });
+  res.json({ ok: true, to: to.join(', '), alerts: al.length });
 }));
 
 /* ---------- usuarios (solo administrador) ---------- */

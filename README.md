@@ -6,7 +6,7 @@ Funciona con **Node + Postgres** y está preparada para **Railway**.
 
 ## Qué trae
 
-- Login con tres roles: **Administrador** (todo y usuarios), **Editor** (edita todos los datos) y **Chofer** (registra kilometraje y checklist con fotos; entra directo a la pantalla del checklist).
+- Login con tres roles: **Administrador** (todo y usuarios), **Editor** (edita todos los datos) y **Chofer** (solo ve y llena el checklist con fotos: no ve vehículos, papeles, alertas ni checklists anteriores, y no puede editar nada más; entra directo a la pantalla del checklist).
 - Los 9 vehículos del Excel se cargan solos la primera vez que arranca (carpeta `seed/`).
 - Alertas por correo automáticas: el servidor revisa cada hora y envía solo cuando aparece una alerta nueva (mantención a 1.000 km o menos, revisión técnica y permiso en la última semana del mes anterior). También revisa poco después de registrar un kilometraje.
 - Página de usuarios en `/admin.html`.
@@ -49,7 +49,7 @@ Sin estas variables todo funciona, pero las alertas solo se ven en pantalla. Agr
 
 Contraseña de aplicación de Google: cuenta de Google → Seguridad → verificación en dos pasos activada → **Contraseñas de aplicaciones**. (En Google Workspace el administrador debe permitirlo.)
 
-Luego, en la página, pestaña **Alertas y correo**, escribe el correo que recibe las alertas y usa **Enviar las alertas ahora** para probar.
+Luego, en la página, pestaña **Alertas y correo**, agrega los correos que reciben las alertas (puedes poner varios) y usa **Enviar las alertas ahora** para probar.
 
 ## Trabajar en tu computador
 
@@ -73,7 +73,8 @@ Los datos viven en el Postgres de Railway. Activa las copias de seguridad del se
 server.js            servidor Express (login, datos, alertas, usuarios)
 lib/store.js         acceso a Postgres
 lib/auth.js          claves, sesiones y permisos por rol
-lib/alerts.js        reglas de alertas y envío de correo
+lib/alerts.js        reglas de alertas y envío de correo (a varios destinatarios)
+lib/checklist.js     guarda un checklist completo (único modo en que escribe un chofer)
 lib/seed.js          carga inicial desde seed/
 public/index.html    la página (todo el código de pantalla)
 public/shim.js       conecta la página con el servidor

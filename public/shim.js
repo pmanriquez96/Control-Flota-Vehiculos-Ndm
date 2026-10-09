@@ -84,9 +84,13 @@
   connect();
   setInterval(function () { if (document.visibilityState === 'visible') { Object.keys(colL).forEach(refreshCol); Object.keys(docL).forEach(refreshDoc); } }, 60000);
 
+  /* quién es el usuario (la página lo usa para mostrar solo lo que le corresponde) */
+  var meP = api('GET', '/api/me');
+  window.NDM_ME_P = meP.then(function (me) { window.NDM_ME = me; return me; }, function () { return null; });
+
   /* barra con el usuario y salir */
   document.addEventListener('DOMContentLoaded', function () {
-    api('GET', '/api/me').then(function (me) {
+    meP.then(function (me) {
       var bar = document.createElement('div');
       bar.style.cssText = 'max-width:1200px;margin:8px auto 24px;padding:0 16px;text-align:right;font:14px/1.4 system-ui,sans-serif;color:#667';
       var span = document.createElement('span'); span.textContent = me.name + ' · ' + ({ admin: 'Administrador', editor: 'Editor', chofer: 'Chofer' }[me.role] || me.role) + ' · ';
@@ -96,7 +100,6 @@
       out.onclick = function (e) { e.preventDefault(); api('POST', '/api/logout').then(function () { location.href = '/login.html'; }); };
       bar.appendChild(out);
       document.body.appendChild(bar);
-      window.NDM_ME = me;
     }, function () {});
   });
 })();
