@@ -151,6 +151,15 @@ td .sub2{display:block;font-size:12.5px;color:var(--muted)}
 details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .solo .tabs,.solo #alertStrip,.solo .kmbar,.solo .gowrap,.solo #recent{display:none}
 .chofer nav{display:none}
+.solo .toprow{display:none}
+.toprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.toprow .kmbar form{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+.toprow .kmbar form label:first-child{grid-column:1/-1}
+#recent header{margin-bottom:6px}
+#recent ul.list>li{padding:6px 0;flex-wrap:nowrap;align-items:center;gap:8px;font-size:13.5px}
+#recent .rc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#recent .rcl{max-height:300px;overflow-y:auto}
+@media (max-width:860px){.toprow{grid-template-columns:1fr}.toprow .kmbar form{grid-template-columns:1fr 1fr}.toprow .kmbar form .btn{grid-column:1/-1}}
 .gowrap{position:relative}
 .gomenu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:270px;max-width:88vw;max-height:70vh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
 .gomenu[hidden]{display:none}
@@ -205,30 +214,30 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="gowrap"><button class="btn pri" id="goChk" data-act="gomenu" aria-haspopup="true" aria-expanded="false">Ir al checklist de inspección ▾</button><div class="gomenu" id="goMenu" role="menu" hidden></div></div><button class="btn sm" id="soloOff" hidden>Ver página completa</button><p class="sync" id="sync" role="status">Conectando con los datos…</p></div>
   </header>
 
+  <div class="toprow">
   <section class="card kmbar" aria-labelledby="kmh">
     <h2 id="kmh">Registrar kilometraje</h2>
-    <p class="hint" id="kmLast" style="margin:0 0 12px" aria-live="polite">Cargando vehículos…</p>
     <form id="kmForm" autocomplete="off">
       <label>Vehículo<select id="kmVeh"></select></label>
       <label>Kilometraje actual<input id="kmVal" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 264500" required></label>
       <label>Fecha<input id="kmDate" type="date" required></label>
       <button class="btn pri" type="submit" id="kmBtn">Guardar</button>
     </form>
-    <p class="hint" id="kmHint" aria-live="polite"></p>
+    <p class="hint" id="kmLast" aria-live="polite">Cargando vehículos…</p>
+    <p class="hint" id="kmHint" style="margin-top:8px" aria-live="polite"></p>
     <p class="hint warnbox" id="kmWarn" aria-live="polite" hidden></p>
   </section>
+  <section class="card" id="recent" aria-label="Últimos checklists"></section>
+  </div>
 
   <section id="alertStrip" aria-live="polite"></section>
-
-  <section class="card" id="recent" aria-label="Últimos checklists" hidden></section>
 
   <nav aria-label="Vehículos"><div class="chips" id="chips"></div></nav>
 
   <div class="tabs" role="tablist" aria-label="Secciones">
     <button class="tab" role="tab" data-tab="veh" aria-selected="true">Vehículo</button>
     <button class="tab" role="tab" data-tab="chk" aria-selected="false">Checklist</button>
-    <button class="tab" role="tab" data-tab="stock" aria-selected="false">Stock Filtros</button>
-    <button class="tab" role="tab" data-tab="rep" aria-selected="false">Otros repuestos</button>
+    <button class="tab" role="tab" data-tab="stock" aria-selected="false">Stock Filtros y Repuestos</button>
     <button class="tab" role="tab" data-tab="flota" aria-selected="false">Toda la flota</button>
     <button class="tab" role="tab" data-tab="alert" aria-selected="false">Alertas y correo</button>
   </div>
@@ -237,7 +246,6 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
     <div id="p-veh" role="tabpanel"><p class="empty">Cargando datos de la flota…</p></div>
     <div id="p-chk" role="tabpanel" hidden></div>
     <div id="p-stock" role="tabpanel" hidden></div>
-    <div id="p-rep" role="tabpanel" hidden></div>
     <div id="p-flota" role="tabpanel" hidden></div>
     <div id="p-alert" role="tabpanel" hidden></div>
   </main>
@@ -510,7 +518,7 @@ var pendingRender=false;
 function render(force){
   if(!force){
     var a=document.activeElement;
-    if(a&&a.closest&&a.closest('#p-veh,#p-alert,#p-chk,#p-rep')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){pendingRender=true;return}
+    if(a&&a.closest&&a.closest('#p-veh,#p-alert,#p-chk,#p-stock')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){pendingRender=true;return}
   }
   pendingRender=false;
   var vs=vlist();
@@ -518,11 +526,10 @@ function render(force){
   if(ui.role==='chofer') ui.tab='chk';
   else {renderKmBar(vs); renderStrip(); renderChips(vs); renderRecent()}
   document.querySelectorAll('.tab').forEach(function(t){t.setAttribute('aria-selected',t.dataset.tab===ui.tab?'true':'false')});
-  ['veh','chk','stock','rep','flota','alert'].forEach(function(k){$('#p-'+k).hidden=(k!==ui.tab)});
+  ['veh','chk','stock','flota','alert'].forEach(function(k){$('#p-'+k).hidden=(k!==ui.tab)});
   if(ui.tab==='veh') renderVeh();
   else if(ui.tab==='chk') renderChkList();
   else if(ui.tab==='stock') renderStockTab();
-  else if(ui.tab==='rep') renderRep();
   else if(ui.tab==='flota') renderFlota();
   else renderAlertTab();
 }
@@ -665,14 +672,14 @@ function cardStock(v){
 }
 function renderStockTab(){
   var vs=vlist();
-  var h='<div class="tablewrap"><table><thead><tr><th>Vehículo</th>'+ITEMS.map(function(it){return '<th>'+esc(it[1])+'</th>'}).join('')+'<th>Última mantención</th></tr></thead><tbody>';
+  var h='<h3 style="margin:0 0 8px">Filtros y aceite por vehículo</h3><div class="tablewrap"><table><thead><tr><th>Vehículo</th>'+ITEMS.map(function(it){return '<th>'+esc(it[1])+'</th>'}).join('')+'<th>Última mantención</th></tr></thead><tbody>';
   vs.forEach(function(v){
     var st=v.stock||{}, info=stockInfo(v), L=info.latest;
     h+='<tr><td><button class="rowbtn" data-act="open" data-id="'+v.id+'"><b>'+esc(shortName(v))+'</b><span class="plate">'+esc(v.patente)+'</span></button></td>'+
       ITEMS.map(function(it){var k=it[0];return '<td>'+(st[k]==null?'<span class="hint">—</span>':st[k]<=0?'<span class="pill bad">Sin stock</span>':'<b>'+fmt(st[k])+'</b>'+(k==='aceite'?' <span class="hint">'+esc(v.aceiteUnidad||'bidones')+'</span>':''))+'</td>'}).join('')+
       '<td>'+(L?esc(mlab(L.month))+'<span class="sub2">'+ITEMS.filter(function(it){return L.set[it[0]]}).map(function(it){return '✓ '+it[1].replace('Filtro de ','F. ').replace('Aceite de motor','Aceite')}).join(' · ')+'</span>':'—')+'</td></tr>';
   });
-  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para cargar o editar su stock.</p>';
+  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para cargar o editar su stock.</p>'+repHtml();
 }
 
 function cardPap(v){
@@ -758,18 +765,18 @@ function chkStats(x){
   return {fails:fails,regs:regs,answered:answered,sinrev:chkKeys().length-answered,nfot:nfot};
 }
 function renderRecent(){
-  var el=$('#recent'), show=(ui.tab==='veh'||ui.tab==='flota')&&Object.keys(S.veh).length>0;
-  el.hidden=!show; if(!show) return;
+  var el=$('#recent');
+  var h='<header><h3>Últimos checklists</h3><span class="hint">Toda la flota</span></header>';
+  if(!Object.keys(S.veh).length){el.innerHTML=h+'<p class="empty">Cargando…</p>';return}
   var L=Object.keys(S.chk).map(function(k){return Object.assign({id:k},S.chk[k])}).sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?1:(a.fecha||'')>(b.fecha||'')?-1:(b.at||0)-(a.at||0)});
-  var h='<header><h3>Últimos checklists</h3><span class="hint">De toda la flota, del más reciente al más antiguo</span></header>';
   if(!L.length){el.innerHTML=h+'<p class="empty">Todavía no se ha hecho ningún checklist.</p>';return}
   var shown=L.slice(0,ui.recentAll?20:5);
-  h+='<ul class="list">'+shown.map(function(x){
+  h+='<ul class="list'+(ui.recentAll?' rcl':'')+'">'+shown.map(function(x){
     var v=S.veh[x.vid], st=chkStats(x);
     var pills=(st.fails.length?pill({s:'bad'},st.fails.length+(st.fails.length===1?' malo':' malos')):'')+(st.regs.length?pill({s:'warn'},st.regs.length+(st.regs.length===1?' regular':' regulares')):'')+(!st.fails.length&&!st.regs.length&&st.answered>0?pill({s:'ok'},'Todo bueno'):'');
-    return '<li><span class="grow"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+'<br><span class="hint">'+fmt(x.km)+' km · Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
+    return '<li><span class="rc"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+' <span class="hint">· '+esc(x.chofer)+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
   }).join('')+'</ul>';
-  if(L.length>5) h+='<p style="margin-top:8px"><button class="link" data-act="recent-more">'+(ui.recentAll?'Ver menos':'Ver más checklists ('+Math.min(L.length,20)+')')+'</button>'+(ui.recentAll&&L.length>20?' <span class="hint">· se muestran los últimos 20; los demás están en el checklist de cada vehículo</span>':'')+'</p>';
+  if(L.length>5) h+='<p style="margin-top:6px"><button class="link" data-act="recent-more">'+(ui.recentAll?'Ver menos':'Ver más ('+Math.min(L.length,20)+')')+'</button>'+(ui.recentAll&&L.length>20?' <span class="hint">· últimos 20; el resto está en el checklist de cada vehículo</span>':'')+'</p>';
   el.innerHTML=h;
 }
 
@@ -779,13 +786,13 @@ function mutRep(fn){
   var d={items:JSON.parse(JSON.stringify((S.rep&&S.rep.items)||[]))}; fn(d); S.rep=d;
   persist('settings/repuestos',{items:d.items},true); render(true);
 }
-function renderRep(){
+function repHtml(){
   var L=repItems();
-  var h='<section class="card"><header><h3>Otros repuestos ('+L.length+')</h3><button class="btn sm pri" data-act="rep-addt">'+(ui.repAdd?'Cancelar':'+ Agregar repuesto')+'</button></header>'+
+  var h='<section class="card" style="margin-top:16px"><header><h3>Otros repuestos ('+L.length+')</h3><button class="btn sm pri" data-act="rep-addt">'+(ui.repAdd?'Cancelar':'+ Agregar repuesto')+'</button></header>'+
     '<p class="hint" style="margin-bottom:10px">Lista manual para los repuestos que no son filtros ni aceite de motor (pastillas, ampolletas, correas, baterías…). Anota lo que hay y ajusta la cantidad cuando uses o compres.</p>';
   if(ui.repAdd) h+='<div class="form" style="margin-bottom:12px">'+fld('rp-nombre','Repuesto','','text','placeholder="Ej: Pastillas de freno delanteras"')+fld('rp-cant','Cantidad','','number','min="0" step="1" inputmode="decimal"')+fld('rp-unid','Unidad','unidades')+fld('rp-nota','Nota (opcional)','','text','placeholder="Ej: sirven para Hino y HD78"')+
     '<div class="acts full"><button class="btn pri" data-act="rep-add">Guardar repuesto</button><button class="btn" data-act="cancel">Cancelar</button></div></div>';
-  if(!L.length){ if(!ui.repAdd) h+='<p class="empty">Todavía no hay repuestos en esta lista. Agrega el primero.</p>'; return $('#p-rep').innerHTML=h+'</section>'; }
+  if(!L.length){ if(!ui.repAdd) h+='<p class="empty">Todavía no hay repuestos en esta lista. Agrega el primero.</p>'; return h+'</section>'; }
   h+='<div class="tablewrap"><table><thead><tr><th>Repuesto</th><th>Cantidad</th><th>Nota</th><th></th></tr></thead><tbody>';
   L.forEach(function(r){
     if(ui.repEdit===r.id){
@@ -797,7 +804,7 @@ function renderRep(){
     h+='<tr><td><b>'+esc(r.nombre)+'</b></td><td><span style="display:inline-flex;align-items:center;gap:8px"><button class="btn sm" data-act="rep-dec" data-id="'+esc(r.id)+'" aria-label="Restar uno">−</button><b>'+fmt(r.cant)+'</b> <span class="hint">'+esc(r.unid||'')+'</span><button class="btn sm" data-act="rep-inc" data-id="'+esc(r.id)+'" aria-label="Sumar uno">+</button></span>'+(r.cant<=0?' '+pill({s:'bad'},'Sin stock'):'')+'</td><td>'+(r.nota?esc(r.nota):'<span class="hint">—</span>')+'</td>'+
       '<td><div class="acts"><button class="btn sm" data-act="rep-edit" data-id="'+esc(r.id)+'">Editar</button>'+(cf?'<button class="btn sm bad" data-act="rep-del" data-id="'+esc(r.id)+'">Sí, borrar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="rep'+esc(r.id)+'">Borrar</button>')+'</div></td></tr>';
   });
-  $('#p-rep').innerHTML=h+'</tbody></table></div></section>';
+  return h+'</tbody></table></div></section>';
 }
 
 /* ---------- alertas y correo ---------- */
