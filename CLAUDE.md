@@ -30,7 +30,7 @@ App interna de **Neumáticos del Maule (NDM)** / Repuestos del Maule para contro
 
 ## Pendientes / ideas
 
-- Configurar el envío de correo (variables `SMTP_*`, ver README). Hoy sin SMTP solo se ven alertas en pantalla.
+- Configurar el envío de correo (ver README). Railway bloquea SMTP en algunos planes («Connection timeout»): se agregó Brevo por HTTPS (`BREVO_API_KEY` + `MAIL_FROM`, `sendBrevo` en `lib/alerts.js`); si existe, se usa en vez de SMTP. Sin ninguno de los dos solo se ven alertas en pantalla.
 - La interfaz del editor aún muestra todo lo que ve el admin (solo `/admin.html` es exclusivo del admin).
 - Probar el checklist con fotos en el celular real de un chofer (cámara trasera directa).
 - Copias de seguridad de Postgres en Railway.

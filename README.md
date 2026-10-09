@@ -34,9 +34,27 @@ Funciona con **Node + Postgres** y está preparada para **Railway**.
 
 Railway hace el despliegue solo cada vez que subes cambios a GitHub. La app crea las tablas y carga los datos iniciales al arrancar.
 
-## Correo de alertas (cuando tengas los datos)
+## Correo de alertas
 
-Sin estas variables todo funciona, pero las alertas solo se ven en pantalla. Agrega en Railway:
+Sin configurar nada funciona todo, pero las alertas solo se ven en pantalla. Hay dos formas de enviarlas por correo:
+
+### Opción A (recomendada en Railway): Brevo por internet
+
+Railway bloquea el envío por SMTP en algunos planes (síntoma: «Connection timeout»). Con Brevo el correo sale por HTTPS y funciona en cualquier plan.
+
+1. Crea una cuenta en brevo.com (el plan gratis alcanza: hasta 300 correos al día).
+2. Verifica el correo desde el que saldrán los avisos (sección *Senders*): Brevo envía un mensaje a esa casilla con un enlace o código.
+3. Crea una clave de API (sección *SMTP & API → API Keys*).
+4. En Railway agrega las variables:
+
+| Variable | Valor |
+|---|---|
+| `BREVO_API_KEY` | la clave de API de Brevo |
+| `MAIL_FROM` | `"Flota NDM <correo-verificado@tu-dominio.cl>"` (el correo debe ser el verificado en Brevo) |
+
+Para que los avisos no caigan en spam, más adelante conviene autenticar el dominio en Brevo (registros SPF y DKIM en el DNS).
+
+### Opción B: SMTP
 
 | Variable | Gmail / Google Workspace | Correo corporativo |
 |---|---|---|
@@ -49,7 +67,11 @@ Sin estas variables todo funciona, pero las alertas solo se ven en pantalla. Agr
 
 Contraseña de aplicación de Google: cuenta de Google → Seguridad → verificación en dos pasos activada → **Contraseñas de aplicaciones**. (En Google Workspace el administrador debe permitirlo.)
 
-Luego, en la página, pestaña **Alertas y correo**, agrega los correos que reciben las alertas (puedes poner varios) y usa **Enviar las alertas ahora** para probar.
+Si existe `BREVO_API_KEY`, se usa Brevo y se ignoran las variables SMTP.
+
+### Probar
+
+En la página, pestaña **Alertas y correo**, agrega los correos que reciben las alertas y usa **Enviar las alertas ahora**. Los errores de envío también quedan en los registros (Logs) de Railway.
 
 ## Trabajar en tu computador
 

@@ -155,7 +155,7 @@ app.post('/api/alerts/send', needUser, needRole('admin', 'editor'), wrap(async (
   const { cfg, alerts: al } = await alerts.buildAlerts();
   const to = alerts.recipients(cfg);
   if (!to.length) return res.status(400).json({ error: 'Falta al menos un correo que reciba las alertas (pestaña Alertas).' });
-  if (!alerts.mailReady()) return res.status(400).json({ error: 'El servidor aún no tiene configurado el envío de correo (variables SMTP_* en Railway).' });
+  if (!alerts.mailReady()) return res.status(400).json({ error: 'El servidor aún no tiene configurado el envío de correo (variable BREVO_API_KEY o SMTP_* en Railway).' });
   const m = alerts.message(al);
   try { await alerts.sendMail(to, m.subject, m.text); } catch (e) { return res.status(502).json({ error: 'No se pudo enviar: ' + e.message }); }
   res.json({ ok: true, to: to.join(', '), alerts: al.length });
