@@ -85,6 +85,16 @@ npm run dev
 
 Prueba rápida de permisos y datos (con el servidor andando): `BASE=http://localhost:3000 ADMIN_PASSWORD=... npm test`
 
+## Instalar en el celular y usar sin señal
+
+La página se puede dejar en el celular como una app:
+- **Android (Chrome):** abrir la dirección, menú de los tres puntos (⋮) → **Instalar app** o **Agregar a la pantalla principal**.
+- **iPhone (Safari):** abrir la dirección, botón de compartir → **Agregar a pantalla de inicio**.
+
+Se instala con el nombre «Flota NDM» y el logo, y abre en pantalla completa. Conviene abrirla al menos una vez con señal.
+
+**Sin señal:** el chofer puede llenar el checklist, con fotos, y tocar Guardar. Queda guardado en el celular (aparece un aviso amarillo arriba) y se envía solo cuando vuelve la conexión. Si se repite el envío, el servidor no duplica el checklist. Mientras esté sin enviar, el checklist solo existe en ese celular: no hay que borrar los datos del navegador ni desinstalar la app hasta que el aviso desaparezca.
+
 ## Copias de seguridad
 
 Los datos viven en el Postgres de Railway. Activa las copias de seguridad del servicio de Postgres y, de vez en cuando, exporta con `pg_dump` usando la URL pública de la base.
@@ -96,10 +106,12 @@ server.js            servidor Express (login, datos, alertas, usuarios)
 lib/store.js         acceso a Postgres
 lib/auth.js          claves, sesiones y permisos por rol
 lib/alerts.js        reglas de alertas y envío de correo (a varios destinatarios)
-lib/checklist.js     guarda un checklist completo (único modo en que escribe un chofer)
+lib/checklist.js     guarda un checklist completo (único modo en que escribe un chofer; no duplica reenvíos)
 lib/seed.js          carga inicial desde seed/
 public/index.html    la página (todo el código de pantalla)
-public/shim.js       conecta la página con el servidor
+public/shim.js       conecta la página con el servidor (y guarda copia local para abrir sin señal)
+public/sw.js         service worker: página disponible sin conexión
+public/manifest.webmanifest  nombre e íconos para instalarla como app
 public/login.html    ingreso
 public/admin.html    usuarios
 seed/                datos iniciales de los 9 vehículos
