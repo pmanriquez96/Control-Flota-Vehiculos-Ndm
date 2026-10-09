@@ -16,7 +16,7 @@ App interna de **Neumáticos del Maule (NDM)** / Repuestos del Maule para contro
 - `vehicles/{id}`: nombre, patente, order, rt (AAAA-MM), rtDia, permiso (AAAA-MM), extintor, nextKm, muni, rut, pago, notas, `pending` [{id,text}], `history` [{id,month,km,text,usos,managed,desc}], `pauta` [{k,v}], `accesorios` {}, `stock` {aire,comb,faceite,polen,aceite}, `aceiteUnidad`, `aceiteUso`.
 - `kmlog/{vehId}`: `{entries:[{id,d,km,nota}]}`.
 - `checklists/{id}`: vid, fecha, km, chofer, peoneta, items, notas, obs, fotos {clave:[idFoto]}. (`resp`, el responsable de la inspección, se eliminó; los checklists antiguos pueden traerlo y no se muestra.)
-- `fotos/{id}`: `{cid,vid,key,d}` con `d` = imagen JPEG en base64 reducida (~100 KB). Se carga solo al abrir el detalle de un checklist.
+- `fotos/{id}`: `{cid,vid,key,d}` con `d` = imagen JPEG en base64 reducida (~100 KB). Se carga solo al abrir el detalle de un checklist. El detalle muestra una galería con **todas** las fotos del checklist, cada una con el nombre del punto (`fotosGaleria`), sin importar la sección.
 - Un documento no puede pasar de 256 KB. No hay arreglos dentro de arreglos.
 
 ## Reglas de negocio ya decididas

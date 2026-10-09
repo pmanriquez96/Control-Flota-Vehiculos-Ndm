@@ -155,6 +155,11 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .toprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 .toprow .kmbar form{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
 .toprow .kmbar form label:first-child{grid-column:1/-1}
+.gal{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 10px}
+.gal figure{margin:0;display:flex;flex-direction:column;gap:4px;width:130px}
+.gal figcaption{font-size:12px;color:var(--muted);line-height:1.25}
+.gal .thumb,.gal .thumb.wait{width:130px;height:130px}
+.gal .thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
 #recent header{margin-bottom:6px}
 #recent ul.list>li{padding:6px 0;flex-wrap:nowrap;align-items:center;gap:8px;font-size:13.5px}
 #recent .rc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -318,14 +323,6 @@ function shrink(file,cb){
 function loadFoto(pid){
   if(S.fotoD[pid]||fotoLoading[pid]||!db) return; fotoLoading[pid]=1;
   db.doc('fotos/'+pid).get().then(function(sn){ if(sn&&sn.exists){S.fotoD[pid]=sn.data().d} else {S.fotoD[pid]='';} render(false)},function(){fotoLoading[pid]=0});
-}
-function fotosHtml(x,key){
-  var ids=(x.fotos||{})[key]; if(!ids||!ids.length) return '';
-  return '<div class="thumbs" style="flex-basis:100%">'+ids.map(function(pid){
-    var d=S.fotoD[pid]; if(d===undefined){loadFoto(pid);return '<div class="thumb wait">Cargando…</div>'}
-    if(!d) return '<div class="thumb wait">No disponible</div>';
-    return '<div class="thumb"><img src="'+d+'" alt="Foto del checklist" data-act="foto-zoom"></div>';
-  }).join('')+'</div>';
 }
 function removeChk(k){
   var c=S.chk[k];
@@ -774,7 +771,7 @@ function renderRecent(){
   var shown=L.slice(0,ui.recentAll?20:5);
   h+='<ul class="list'+(ui.recentAll?' rcl':'')+'">'+shown.map(function(x){
     var v=S.veh[x.vid], st=chkStats(x);
-    var pills=(st.fails.length?pill({s:'bad'},st.fails.length+(st.fails.length===1?' malo':' malos')):'')+(st.regs.length?pill({s:'warn'},st.regs.length+(st.regs.length===1?' regular':' regulares')):'')+(!st.fails.length&&!st.regs.length&&st.answered>0?pill({s:'ok'},'Todo bueno'):'');
+    var pills=(st.fails.length?pill({s:'bad'},st.fails.length+(st.fails.length===1?' malo':' malos')):'')+(st.regs.length?pill({s:'warn'},st.regs.length+(st.regs.length===1?' regular':' regulares')):'')+(!st.fails.length&&!st.regs.length&&st.answered>0?pill({s:'ok'},'Todo bueno'):'')+(st.nfot?pill({s:'none'},st.nfot+(st.nfot===1?' foto':' fotos')):'');
     return '<li><span class="rc"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+' <span class="hint">· '+esc(x.chofer)+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
   }).join('')+'</ul>';
   if(L.length>5) h+='<p style="margin-top:6px"><button class="link" data-act="recent-more">'+(ui.recentAll?'Ver menos':'Ver más ('+Math.min(L.length,20)+')')+'</button>'+(ui.recentAll&&L.length>20?' <span class="hint">· últimos 20; el resto está en el checklist de cada vehículo</span>':'')+'</p>';
@@ -898,11 +895,17 @@ function updChkCount(){
   chkKeys().forEach(function(k){if(document.querySelector('input[name="r-'+k+'"]:checked'))done++});
   var e=$('#ck-count'); if(e) e.textContent=done+' de '+tot+' puntos revisados · lo que no aplique se deja sin marcar';
 }
-/* fotos de puntos que ya no están en el checklist (por ejemplo de versiones anteriores): se muestran igual */
-function otrasFotos(x){
-  var ks=Object.keys(x.fotos||{}).filter(function(k){return k!=='obs'&&!CHKNAME[k]});
-  if(!ks.length) return '';
-  return '<p class="fl" style="margin-top:8px">Otras fotos</p>'+ks.map(function(k){return fotosHtml(x,k)}).join('');
+/* todas las fotos del checklist juntas, cada una con el nombre del punto donde se sacó */
+function fotosGaleria(x){
+  var L=[]; Object.keys(x.fotos||{}).forEach(function(k){(x.fotos[k]||[]).forEach(function(pid){L.push({k:k,pid:pid})})});
+  if(!L.length) return '';
+  return '<p class="fl" style="margin-top:8px">Fotos ('+L.length+')</p><div class="gal">'+L.map(function(f){
+    var d=S.fotoD[f.pid], lab=f.k==='obs'?'Observaciones generales':(CHKNAME[f.k]||'Otro punto'), im;
+    if(d===undefined){loadFoto(f.pid);im='<div class="thumb wait">Cargando…</div>'}
+    else if(!d) im='<div class="thumb wait">No disponible</div>';
+    else im='<div class="thumb"><img src="'+d+'" alt="Foto: '+esc(lab)+'" data-act="foto-zoom"></div>';
+    return '<figure>'+im+'<figcaption>'+esc(lab)+'</figcaption></figure>';
+  }).join('')+'</div>';
 }
 function renderChkList(){
   if(!chkBuilt) buildChkForm();
@@ -921,7 +924,7 @@ function renderChkList(){
     var open=ui.chkOpen===x.id, cf=ui.confirm==='chk'+x.id;
     var det='';
     if(open){
-      det='<div style="flex-basis:100%">'+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it)+fotosHtml(x,'ctab');var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'+fotosHtml(x,it[0])}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+fotosHtml(x,'obs')+otrasFotos(x)+'</div>';
+      det='<div style="flex-basis:100%">'+fotosGaleria(x)+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it);var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+'</div>';
     }
     return '<li><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
       (fails.length?pill({s:'bad'},fails.length+(fails.length===1?' malo':' malos')):'')+(regs.length?pill({s:'warn'},regs.length+(regs.length===1?' regular':' regulares')):'')+(!fails.length&&!regs.length&&answered>0?pill({s:'ok'},'Todo bueno'):'')+(sinrev>0?pill({s:'none'},sinrev+' sin revisar'):'')+(nfot?pill({s:'none'},nfot+(nfot===1?' foto':' fotos')):'')+
