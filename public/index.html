@@ -149,7 +149,15 @@ td .sub2{display:block;font-size:12.5px;color:var(--muted)}
 .checkline input[type=checkbox]{width:20px;height:20px}
 .checkline input[type=number]{width:110px;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface)}
 details>summary{cursor:pointer;font-weight:600;min-height:32px}
-.solo .tabs,.solo #alertStrip,.solo .kmbar,.solo #goChk{display:none}
+.solo .tabs,.solo #alertStrip,.solo .kmbar,.solo .gowrap,.solo #recent{display:none}
+.chofer nav{display:none}
+.gowrap{position:relative}
+.gomenu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:270px;max-width:88vw;max-height:70vh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
+.gomenu[hidden]{display:none}
+.gomenu .gh{font-size:12px;color:var(--muted);padding:6px 10px 4px}
+.gomenu button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:10px;min-height:44px;color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.gomenu button:hover,.gomenu button:focus-visible{background:var(--accent-soft)}
+.gomenu .plate{font-weight:500}
 .tick{width:26px;height:26px;border:2px solid var(--muted);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;line-height:1;background:var(--surface);flex:none}
 .tick.on{background:var(--ok-solid);border-color:var(--ok-solid);color:var(--solid-ink)}
 .stk{list-style:none;margin:0;padding:0}
@@ -194,28 +202,33 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
         <p class="sub">Mantenciones, papeles y checklist de la flota</p>
       </div>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn pri" id="goChk" data-act="tab" data-tab="chk">Ir al checklist de inspección</button><button class="btn sm" id="soloOff" hidden>Ver página completa</button><p class="sync" id="sync" role="status">Conectando con los datos…</p></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="gowrap"><button class="btn pri" id="goChk" data-act="gomenu" aria-haspopup="true" aria-expanded="false">Ir al checklist de inspección ▾</button><div class="gomenu" id="goMenu" role="menu" hidden></div></div><button class="btn sm" id="soloOff" hidden>Ver página completa</button><p class="sync" id="sync" role="status">Conectando con los datos…</p></div>
   </header>
 
   <section class="card kmbar" aria-labelledby="kmh">
     <h2 id="kmh">Registrar kilometraje</h2>
+    <p class="hint" id="kmLast" style="margin:0 0 12px" aria-live="polite">Cargando vehículos…</p>
     <form id="kmForm" autocomplete="off">
       <label>Vehículo<select id="kmVeh"></select></label>
       <label>Kilometraje actual<input id="kmVal" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 264500" required></label>
       <label>Fecha<input id="kmDate" type="date" required></label>
       <button class="btn pri" type="submit" id="kmBtn">Guardar</button>
     </form>
-    <p class="hint" id="kmHint" aria-live="polite">Cargando vehículos…</p>
+    <p class="hint" id="kmHint" aria-live="polite"></p>
+    <p class="hint warnbox" id="kmWarn" aria-live="polite" hidden></p>
   </section>
 
   <section id="alertStrip" aria-live="polite"></section>
+
+  <section class="card" id="recent" aria-label="Últimos checklists" hidden></section>
 
   <nav aria-label="Vehículos"><div class="chips" id="chips"></div></nav>
 
   <div class="tabs" role="tablist" aria-label="Secciones">
     <button class="tab" role="tab" data-tab="veh" aria-selected="true">Vehículo</button>
     <button class="tab" role="tab" data-tab="chk" aria-selected="false">Checklist</button>
-    <button class="tab" role="tab" data-tab="stock" aria-selected="false">Stock</button>
+    <button class="tab" role="tab" data-tab="stock" aria-selected="false">Stock Filtros</button>
+    <button class="tab" role="tab" data-tab="rep" aria-selected="false">Otros repuestos</button>
     <button class="tab" role="tab" data-tab="flota" aria-selected="false">Toda la flota</button>
     <button class="tab" role="tab" data-tab="alert" aria-selected="false">Alertas y correo</button>
   </div>
@@ -224,6 +237,7 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
     <div id="p-veh" role="tabpanel"><p class="empty">Cargando datos de la flota…</p></div>
     <div id="p-chk" role="tabpanel" hidden></div>
     <div id="p-stock" role="tabpanel" hidden></div>
+    <div id="p-rep" role="tabpanel" hidden></div>
     <div id="p-flota" role="tabpanel" hidden></div>
     <div id="p-alert" role="tabpanel" hidden></div>
   </main>
@@ -239,16 +253,16 @@ var CHK=[
  {t:'Documentación',i:[['perm','Permiso de circulación'],['rt','Revisión técnica'],['soap','SOAP']]},
  {t:'Luces',i:[['lbaja','Luces bajas'],['lalta','Luces altas'],['linter','Intermitentes'],['lfreno','Luces de freno'],['lretro','Luz de retroceso'],['lpat','Luz de patente']]},
  {t:'Neumáticos y ruedas',i:[['ndel','Neumáticos delanteros'],['ntra','Neumáticos traseros'],['npres','Presión de aire'],['nrep','Rueda de repuesto']]},
- {t:'Motor y niveles',i:[['maceite','Nivel de aceite de motor'],['mrefri','Nivel de refrigerante'],['mfreno','Líquido de frenos'],['mbat','Batería y bornes'],['mfuga','Fugas visibles'],['mcorr','Correas y mangueras']]},
- {t:'Cabina y carrocería',i:[['cpara','Parabrisas'],['climp','Limpiaparabrisas'],['cespe','Espejos'],['cboc','Bocina'],['ccint','Cinturones de seguridad'],['ctab','Testigos encendidos en tablero'],['climpi','Limpieza de cabina y exterior']]},
+ {t:'Motor y niveles',i:[['maceite','Nivel de aceite de motor'],['mrefri','Nivel de refrigerante'],['mfreno','Líquido de frenos'],['mfuga','Fugas visibles']]},
+ {t:'Cabina y carrocería',i:[['cpara','Parabrisas'],['climp','Plumillas'],['cespe','Espejos'],['cboc','Bocina'],['ctab','Testigos encendidos en tablero'],['climpi','Limpieza de cabina y exterior']]},
  {t:'Kit de seguridad',i:[['kext','Extintor vigente y cargado'],['ktri','Triángulos de seguridad'],['kchal','Chaleco reflectante'],['kbot','Botiquín de primeros auxilios'],['kgata','Gata'],['kllave','Llave de ruedas']]}
 ];
 var CHKMULTI={ctab:[['check','Check Engine'],['abs','Abs'],['airbag','Airbag'],['otro','Otro']]};
 var CHKNAME={};CHK.forEach(function(s){s.i.forEach(function(x){CHKNAME[x[0]]=x[1]})});
 
 var db=null, unsub=[];
-var S={people:[],veh:{},km:{},chk:{},cfg:{email:'',mantOn:true,mantKm:1000,rtOn:true,permOn:true}};
-var ui={sel:null,tab:'veh',edit:null,addHist:false,addPend:false,confirm:null,filter:'',lastKmWarn:null,chkOpen:null,loaded:{veh:false},canWrite:true};
+var S={people:[],veh:{},km:{},chk:{},rep:{items:[]},cfg:{emails:[],mantOn:true,mantKm:1000,rtOn:true,permOn:true}};
+var ui={role:null,recentAll:false,repAdd:false,repEdit:null,sel:null,tab:'veh',edit:null,addHist:false,addPend:false,confirm:null,filter:'',lastKmWarn:null,chkOpen:null,loaded:{veh:false},canWrite:true};
 var $=function(s,r){return (r||document).querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function fmt(n){return (n==null||n==='')?'—':Number(n).toLocaleString('es-CL')}
@@ -496,17 +510,19 @@ var pendingRender=false;
 function render(force){
   if(!force){
     var a=document.activeElement;
-    if(a&&a.closest&&a.closest('#p-veh,#p-alert,#p-chk')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){pendingRender=true;return}
+    if(a&&a.closest&&a.closest('#p-veh,#p-alert,#p-chk,#p-rep')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){pendingRender=true;return}
   }
   pendingRender=false;
   var vs=vlist();
   if(vs.length&&(!ui.sel||!S.veh[ui.sel])) ui.sel=vs[0].id;
-  renderKmBar(vs); renderStrip(); renderChips(vs);
+  if(ui.role==='chofer') ui.tab='chk';
+  else {renderKmBar(vs); renderStrip(); renderChips(vs); renderRecent()}
   document.querySelectorAll('.tab').forEach(function(t){t.setAttribute('aria-selected',t.dataset.tab===ui.tab?'true':'false')});
-  ['veh','chk','stock','flota','alert'].forEach(function(k){$('#p-'+k).hidden=(k!==ui.tab)});
+  ['veh','chk','stock','rep','flota','alert'].forEach(function(k){$('#p-'+k).hidden=(k!==ui.tab)});
   if(ui.tab==='veh') renderVeh();
   else if(ui.tab==='chk') renderChkList();
   else if(ui.tab==='stock') renderStockTab();
+  else if(ui.tab==='rep') renderRep();
   else if(ui.tab==='flota') renderFlota();
   else renderAlertTab();
 }
@@ -522,12 +538,12 @@ function renderKmBar(vs){
   }
   if(ui.sel) sel.value=ui.sel;
   if(!$('#kmDate').value) $('#kmDate').value=todayStr();
-  var v=S.veh[ui.sel]; var h=$('#kmHint');
-  if(!v){h.textContent='Cargando vehículos…';return}
+  var v=S.veh[ui.sel], l=$('#kmLast'), h=$('#kmHint'), w=$('#kmWarn');
+  if(!v){l.textContent='Cargando vehículos…';h.textContent='';w.hidden=true;return}
   var c=curKm(ui.sel), ms=mantSt(Object.assign({id:ui.sel},v));
-  h.textContent=(c?'Último registro: '+fmt(c.km)+' km ('+c.d.split('-').reverse().join('-')+')':'Aún sin kilometraje registrado')+(v.nextKm?' · Próxima mantención: '+fmt(v.nextKm)+' km ('+ms.txt.toLowerCase()+')':' · Próxima mantención sin definir');
-  h.classList.remove('warnbox');
-  if(ui.lastKmWarn&&ui.lastKmWarn.id===ui.sel){h.textContent=ui.lastKmWarn.msg;h.classList.add('warnbox')}
+  l.innerHTML=c?'Último kilometraje registrado: <b>'+fmt(c.km)+' km</b> ('+c.d.split('-').reverse().join('-')+')':'Aún sin kilometraje registrado';
+  h.innerHTML=v.nextKm?'Próxima mantención: <b>'+fmt(v.nextKm)+' km</b> ('+esc(ms.txt.toLowerCase())+')':'Próxima mantención sin definir';
+  var warn=!!(ui.lastKmWarn&&ui.lastKmWarn.id===ui.sel); w.hidden=!warn; w.textContent=warn?ui.lastKmWarn.msg:'';
 }
 function renderStrip(){
   var el=$('#alertStrip'); if(!Object.keys(S.veh).length){el.innerHTML='';return}
@@ -732,6 +748,58 @@ function renderFlota(){
   $('#p-flota').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">Toca un vehículo para ver y editar toda su ficha.</p>';
 }
 
+/* ---------- últimos checklists (toda la flota) ---------- */
+function chkStats(x){
+  var fails=Object.keys(x.items||{}).filter(function(k){return x.items[k]==='malo'||x.items[k]==='falla'});
+  var regs=Object.keys(x.items||{}).filter(function(k){return x.items[k]==='regular'});
+  if(Array.isArray((x.items||{}).ctab)&&x.items.ctab.length) fails.push('ctab');
+  var answered=chkKeys().filter(function(k){return (x.items||{})[k]}).length;
+  var nfot=Object.keys(x.fotos||{}).reduce(function(n,k){return n+x.fotos[k].length},0);
+  return {fails:fails,regs:regs,answered:answered,sinrev:chkKeys().length-answered,nfot:nfot};
+}
+function renderRecent(){
+  var el=$('#recent'), show=(ui.tab==='veh'||ui.tab==='flota')&&Object.keys(S.veh).length>0;
+  el.hidden=!show; if(!show) return;
+  var L=Object.keys(S.chk).map(function(k){return Object.assign({id:k},S.chk[k])}).sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?1:(a.fecha||'')>(b.fecha||'')?-1:(b.at||0)-(a.at||0)});
+  var h='<header><h3>Últimos checklists</h3><span class="hint">De toda la flota, del más reciente al más antiguo</span></header>';
+  if(!L.length){el.innerHTML=h+'<p class="empty">Todavía no se ha hecho ningún checklist.</p>';return}
+  var shown=L.slice(0,ui.recentAll?20:5);
+  h+='<ul class="list">'+shown.map(function(x){
+    var v=S.veh[x.vid], st=chkStats(x);
+    var pills=(st.fails.length?pill({s:'bad'},st.fails.length+(st.fails.length===1?' malo':' malos')):'')+(st.regs.length?pill({s:'warn'},st.regs.length+(st.regs.length===1?' regular':' regulares')):'')+(!st.fails.length&&!st.regs.length&&st.answered>0?pill({s:'ok'},'Todo bueno'):'');
+    return '<li><span class="grow"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+'<br><span class="hint">'+fmt(x.km)+' km · Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
+  }).join('')+'</ul>';
+  if(L.length>5) h+='<p style="margin-top:8px"><button class="link" data-act="recent-more">'+(ui.recentAll?'Ver menos':'Ver más checklists ('+Math.min(L.length,20)+')')+'</button>'+(ui.recentAll&&L.length>20?' <span class="hint">· se muestran los últimos 20; los demás están en el checklist de cada vehículo</span>':'')+'</p>';
+  el.innerHTML=h;
+}
+
+/* ---------- otros repuestos (lista manual) ---------- */
+function repItems(){return ((S.rep&&S.rep.items)||[]).slice().sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre),'es')})}
+function mutRep(fn){
+  var d={items:JSON.parse(JSON.stringify((S.rep&&S.rep.items)||[]))}; fn(d); S.rep=d;
+  persist('settings/repuestos',{items:d.items},true); render(true);
+}
+function renderRep(){
+  var L=repItems();
+  var h='<section class="card"><header><h3>Otros repuestos ('+L.length+')</h3><button class="btn sm pri" data-act="rep-addt">'+(ui.repAdd?'Cancelar':'+ Agregar repuesto')+'</button></header>'+
+    '<p class="hint" style="margin-bottom:10px">Lista manual para los repuestos que no son filtros ni aceite de motor (pastillas, ampolletas, correas, baterías…). Anota lo que hay y ajusta la cantidad cuando uses o compres.</p>';
+  if(ui.repAdd) h+='<div class="form" style="margin-bottom:12px">'+fld('rp-nombre','Repuesto','','text','placeholder="Ej: Pastillas de freno delanteras"')+fld('rp-cant','Cantidad','','number','min="0" step="1" inputmode="decimal"')+fld('rp-unid','Unidad','unidades')+fld('rp-nota','Nota (opcional)','','text','placeholder="Ej: sirven para Hino y HD78"')+
+    '<div class="acts full"><button class="btn pri" data-act="rep-add">Guardar repuesto</button><button class="btn" data-act="cancel">Cancelar</button></div></div>';
+  if(!L.length){ if(!ui.repAdd) h+='<p class="empty">Todavía no hay repuestos en esta lista. Agrega el primero.</p>'; return $('#p-rep').innerHTML=h+'</section>'; }
+  h+='<div class="tablewrap"><table><thead><tr><th>Repuesto</th><th>Cantidad</th><th>Nota</th><th></th></tr></thead><tbody>';
+  L.forEach(function(r){
+    if(ui.repEdit===r.id){
+      h+='<tr><td colspan="4"><div class="form">'+fld('er-nombre','Repuesto',r.nombre)+fld('er-cant','Cantidad',r.cant,'number','min="0" step="1" inputmode="decimal"')+fld('er-unid','Unidad',r.unid||'')+fld('er-nota','Nota',r.nota||'')+
+        '<div class="acts full"><button class="btn sm pri" data-act="rep-save" data-id="'+esc(r.id)+'">Guardar</button><button class="btn sm" data-act="cancel">Cancelar</button></div></div></td></tr>';
+      return;
+    }
+    var cf=ui.confirm==='rep'+r.id;
+    h+='<tr><td><b>'+esc(r.nombre)+'</b></td><td><span style="display:inline-flex;align-items:center;gap:8px"><button class="btn sm" data-act="rep-dec" data-id="'+esc(r.id)+'" aria-label="Restar uno">−</button><b>'+fmt(r.cant)+'</b> <span class="hint">'+esc(r.unid||'')+'</span><button class="btn sm" data-act="rep-inc" data-id="'+esc(r.id)+'" aria-label="Sumar uno">+</button></span>'+(r.cant<=0?' '+pill({s:'bad'},'Sin stock'):'')+'</td><td>'+(r.nota?esc(r.nota):'<span class="hint">—</span>')+'</td>'+
+      '<td><div class="acts"><button class="btn sm" data-act="rep-edit" data-id="'+esc(r.id)+'">Editar</button>'+(cf?'<button class="btn sm bad" data-act="rep-del" data-id="'+esc(r.id)+'">Sí, borrar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="rep'+esc(r.id)+'">Borrar</button>')+'</div></td></tr>';
+  });
+  $('#p-rep').innerHTML=h+'</tbody></table></div></section>';
+}
+
 /* ---------- alertas y correo ---------- */
 function alertMessage(){
   var al=buildAlerts(false), d=todayStr().split('-').reverse().join('-');
@@ -743,17 +811,20 @@ function alertMessage(){
 function renderAlertTab(){
   var c=S.cfg, al=buildAlerts(true), m=alertMessage();
   var h='<div class="two"><section class="card"><header><h3>Cuándo avisar</h3></header><div style="display:flex;flex-direction:column;gap:14px">'+
-    '<label class="field"><span>Correo que recibe las alertas</span><input id="cf-email" type="email" placeholder="nombre@empresa.cl" value="'+esc(c.email||'')+'"></label>'+
+    '<div class="field"><span>Correos que reciben las alertas ('+(c.emails||[]).length+')</span>'+
+      ((c.emails||[]).length?'<ul class="list" style="margin:6px 0">'+c.emails.map(function(m,i){return '<li><span class="grow">'+esc(m)+'</span><div class="acts"><button class="btn sm" data-act="mail-del" data-i="'+i+'">Quitar</button></div></li>'}).join('')+'</ul>':'<p class="empty" style="margin:6px 0">Todavía no hay correos. Agrega el primero.</p>')+
+      '<div class="form" style="margin-top:6px"><label class="field"><span class="sr">Agregar correo</span><input id="cf-email-new" type="text" inputmode="email" autocomplete="off" placeholder="nombre@empresa.cl (puedes pegar varios separados por coma)"></label><button class="btn" data-act="mail-add">Agregar correo</button></div></div>'+
     '<div class="checkline"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></div>'+
     '<div class="checkline"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior</label></div>'+
     '<div class="checkline"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
     '<div class="acts"><button class="btn pri" data-act="cfg-save">Guardar configuración</button></div></div></section>'+
     '<section class="card"><header><h3>Alertas activas ('+al.length+')</h3></header>'+
     (al.length?'<ul class="list">'+al.map(function(a){return '<li><span class="pill '+a.s+'">'+(a.s==='bad'?'Urgente':'Atención')+'</span><span class="grow"><b>'+esc(a.kind)+'</b> · '+esc(a.v.nombre)+' <span class="plate">'+esc(a.v.patente)+'</span><br>'+esc(a.txt)+'</span><button class="btn sm" data-act="open" data-id="'+a.v.id+'">Ver ficha</button></li>'}).join('')+'</ul>':'<p class="empty">No hay alertas activas.</p>')+'</section></div>';
-  var mailto='mailto:'+encodeURIComponent(c.email||'').replace(/%40/g,'@')+'?subject='+encodeURIComponent(m.subject)+'&body='+encodeURIComponent(m.body);
+  var mails=(c.emails||[]).join(', ');
+  var mailto='mailto:'+encodeURIComponent(mails).replace(/%40/g,'@')+'?subject='+encodeURIComponent(m.subject)+'&body='+encodeURIComponent(m.body);
   h+='<section class="card" style="margin-top:16px"><header><h3>'+(window.NDM_SERVER?'Correo de alertas':'Correo listo para enviar')+'</h3></header>'+
-    (window.NDM_SERVER?'<p class="hint" style="margin-bottom:10px">El servidor revisa las alertas cada hora y envía el correo solo cuando aparece una alerta nueva (y lo repite cada 7 días mientras siga activa). También se revisa poco después de registrar un kilometraje. El destinatario es el correo guardado arriba.</p><div class="acts" style="margin-bottom:12px"><button class="btn pri" data-act="mail-send">Enviar las alertas ahora</button></div>':'<p class="hint" style="margin-bottom:10px">Esta página no envía correos sola. El mensaje se arma con las alertas marcadas arriba. Copia el texto o abre tu programa de correo. Si el enlace no abre nada, usa Copiar.</p>')+
-    '<p><b>Para:</b> <span id="mailTo">'+esc(c.email||'(escribe el correo arriba)')+'</span></p><p><b>Asunto:</b> <span id="mailSub">'+esc(m.subject)+'</span></p>'+
+    (window.NDM_SERVER?'<p class="hint" style="margin-bottom:10px">El servidor revisa las alertas cada hora y envía el correo solo cuando aparece una alerta nueva (y lo repite cada 7 días mientras siga activa). También se revisa poco después de registrar un kilometraje. Los destinatarios son los correos de la lista de arriba.</p><div class="acts" style="margin-bottom:12px"><button class="btn pri" data-act="mail-send">Enviar las alertas ahora</button></div>':'<p class="hint" style="margin-bottom:10px">Esta página no envía correos sola. El mensaje se arma con las alertas marcadas arriba. Copia el texto o abre tu programa de correo. Si el enlace no abre nada, usa Copiar.</p>')+
+    '<p><b>Para:</b> <span id="mailTo">'+esc(mails||'(agrega al menos un correo arriba)')+'</span></p><p><b>Asunto:</b> <span id="mailSub">'+esc(m.subject)+'</span></p>'+
     '<div class="msg" id="mailBody" style="margin-block:10px">'+esc(m.body)+'</div>'+
     '<div class="acts"><button class="btn pri" data-act="copymail">Copiar mensaje</button><a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" href="'+esc(mailto)+'">Abrir en mi correo</a></div></section>';
   $('#p-alert').innerHTML=h;
@@ -765,12 +836,18 @@ function personField(id,label,peon){
   return '<div class="field"><span>'+esc(label)+(peon?' (opcional)':'')+'</span><select id="'+id+'-sel" aria-label="'+esc(label)+'"></select><input id="'+id+'-otro" class="inp" type="text" placeholder="Escribe el nombre" hidden></div>';
 }
 function fillPeople(){
-  [['ck-chofer',false],['ck-peon',true],['ck-resp',false]].forEach(function(x){
+  [['ck-chofer',false],['ck-peon',true]].forEach(function(x){
     var s=$('#'+x[0]+'-sel'); if(!s) return; var cur=s.value;
     s.innerHTML='<option value="">Elegir…</option>'+(x[1]?'<option value="__none">Sin peoneta</option>':'')+S.people.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')+'<option value="__otro">Otro (escribir nombre)…</option>';
     s.value=cur; if(s.value!==cur) s.value='';
     $('#'+x[0]+'-otro').hidden=(s.value!=='__otro');
   });
+}
+function fillVehSel(){
+  var sel=$('#ck-veh'); if(!sel) return;
+  var vs=vlist(), sig=vs.map(function(v){return v.id+v.nombre+v.patente}).join('|');
+  if(sel.dataset.sig!==sig){sel.dataset.sig=sig;sel.innerHTML=vs.map(function(v){return '<option value="'+esc(v.id)+'">'+esc(v.nombre)+' · '+esc(v.patente)+'</option>'}).join('')}
+  sel.value=ui.sel||'';
 }
 function getPerson(id){
   var v=$('#'+id+'-sel').value;
@@ -779,12 +856,12 @@ function getPerson(id){
   return v;
 }
 function buildChkForm(){
-  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Se guarda en el historial del vehículo elegido arriba. Pantalla solo del checklist: agrega #checklist al final del enlace de la página.</span></header><form id="chkForm" autocomplete="off">'+
+  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span></header><form id="chkForm" autocomplete="off">'+
    '<div class="form" style="margin-bottom:14px">'+
-   '<label class="field"><span>Vehículo</span><input id="ck-veh" readonly></label>'+
+   '<label class="field"><span>Vehículo</span><select id="ck-veh"></select></label>'+
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
    '<label class="field"><span>Kilometraje actual</span><input id="ck-km" type="number" inputmode="numeric" min="0" required></label>'+
-   personField('ck-chofer','Nombre del chofer',false)+personField('ck-peon','Nombre del peoneta',true)+personField('ck-resp','Responsable de la inspección',false)+
+   personField('ck-chofer','Nombre del chofer',false)+personField('ck-peon','Nombre del peoneta',true)+
    '<label class="checkline full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
    '<div class="acts" style="margin-bottom:12px"><button type="button" class="btn sm" data-act="chk-allbueno">Marcar todo Bueno</button><button type="button" class="btn sm" data-act="chk-clear">Limpiar</button><span class="hint" id="ck-count" style="align-self:center"></span></div>'+
    '<div style="display:flex;flex-direction:column;gap:12px">';
@@ -816,31 +893,53 @@ function updChkCount(){
 function renderChkList(){
   if(!chkBuilt) buildChkForm();
   var v=S.veh[ui.sel]; if(!v) return;
-  $('#ck-veh').value=v.nombre+' · '+v.patente; fillPeople();
+  fillVehSel(); fillPeople();
   if(!$('#ck-km').value){var c=curKm(ui.sel); if(c) $('#ck-km').placeholder='Último: '+fmt(c.km)}
+  if(ui.role==='chofer'){$('#chkList').innerHTML='';return}
   var L=Object.keys(S.chk).map(function(k){return Object.assign({id:k},S.chk[k])}).filter(function(x){return x.vid===ui.sel}).sort(function(a,b){return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:(b.at||0)-(a.at||0)});
-  var ph='<section class="card" style="margin-bottom:16px"><header><h3>Nombres del personal ('+S.people.length+')</h3><span class="hint">Aparecen en los menús de chofer, peoneta y responsable</span></header>'+
+  var ph='<section class="card" style="margin-bottom:16px"><header><h3>Nombres del personal ('+S.people.length+')</h3><span class="hint">Aparecen en los menús de chofer y peoneta</span></header>'+
     (S.people.length?'<ul class="list">'+S.people.map(function(n,i){var cf=ui.confirm==='ppl'+i;return '<li><span class="grow">'+esc(n)+'</span><div class="acts">'+(cf?'<button class="btn sm bad" data-act="ppl-del" data-i="'+i+'">Sí, quitar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="ppl'+i+'">Quitar</button>')+'</div></li>'}).join('')+'</ul>':'<p class="empty">Aún no hay nombres. Agregue el primero.</p>')+
     '<div class="form" style="margin-top:10px"><label class="field"><span>Agregar nombre</span><input id="ppl-new" type="text" placeholder="Ej: Jacob"></label><button class="btn pri" data-act="ppl-add">Agregar a la lista</button></div></section>';
   var h=ph+'<section class="card"><header><h3>Checklists guardados de '+esc(shortName(v))+' ('+L.length+')</h3></header>';
   if(!L.length) h+='<p class="empty">Todavía no hay inspecciones para este vehículo.</p>';
   else h+='<ul class="list">'+L.map(function(x){
-    var fails=Object.keys(x.items||{}).filter(function(k){return x.items[k]==='malo'||x.items[k]==='falla'});
-    var regs=Object.keys(x.items||{}).filter(function(k){return x.items[k]==='regular'});
-    if(Array.isArray((x.items||{}).ctab)&&x.items.ctab.length) fails.push('ctab');
-    var answered=chkKeys().filter(function(k){return (x.items||{})[k]}).length, sinrev=chkKeys().length-answered;
-    var nfot=Object.keys(x.fotos||{}).reduce(function(n,k){return n+x.fotos[k].length},0);
+    var st0=chkStats(x), fails=st0.fails, regs=st0.regs, answered=st0.answered, sinrev=st0.sinrev, nfot=st0.nfot;
     var open=ui.chkOpen===x.id, cf=ui.confirm==='chk'+x.id;
     var det='';
     if(open){
       det='<div style="flex-basis:100%">'+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it);var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'+fotosHtml(x,it[0])}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+fotosHtml(x,'obs')+'</div>';
     }
-    return '<li><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+' · Inspección: '+esc(x.resp)+'</span></span>'+
+    return '<li><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
       (fails.length?pill({s:'bad'},fails.length+(fails.length===1?' malo':' malos')):'')+(regs.length?pill({s:'warn'},regs.length+(regs.length===1?' regular':' regulares')):'')+(!fails.length&&!regs.length&&answered>0?pill({s:'ok'},'Todo bueno'):'')+(sinrev>0?pill({s:'none'},sinrev+' sin revisar'):'')+(nfot?pill({s:'none'},nfot+(nfot===1?' foto':' fotos')):'')+
       '<div class="acts"><button class="btn sm" data-act="chk-open" data-id="'+x.id+'">'+(open?'Ocultar':'Ver detalle')+'</button>'+(cf?'<button class="btn sm bad" data-act="chk-del" data-id="'+x.id+'">Sí, borrar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="chk'+x.id+'">Borrar</button>')+'</div>'+det+'</li>';
   }).join('')+'</ul>';
   $('#chkList').innerHTML=h+'</section>';
 }
+
+/* ---------- correos de alertas ---------- */
+var EMAIL_RE=/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+/* Lee lo escrito en "Agregar correo". Devuelve la lista de correos nuevos, o false si alguno no es válido. */
+function takeNewEmails(){
+  var inp=$('#cf-email-new'); if(!inp||!inp.value.trim()) return [];
+  var parts=inp.value.split(/[,;\s]+/).filter(Boolean), bad=parts.filter(function(x){return !EMAIL_RE.test(x)});
+  if(bad.length){toast('Correo no válido: '+bad.join(', '),'bad');return false}
+  return parts;
+}
+/* Configuración actual de la pestaña (lo que está marcado en pantalla) más los correos nuevos. */
+function readCfg(nuevos){
+  var seen={}, emails=[];
+  (S.cfg.emails||[]).concat(nuevos||[]).forEach(function(m){var k=m.toLowerCase(); if(!seen[k]){seen[k]=1;emails.push(m)}});
+  var f=function(id){return $(id)};
+  return {emails:emails,email:'',
+    mantOn:f('#cf-mant')?f('#cf-mant').checked:S.cfg.mantOn,
+    mantKm:f('#cf-km')?Math.max(100,parseInt(f('#cf-km').value,10)||1000):S.cfg.mantKm,
+    rtOn:f('#cf-rt')?f('#cf-rt').checked:S.cfg.rtOn,
+    permOn:f('#cf-per')?f('#cf-per').checked:S.cfg.permOn};
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target.id==='cf-email-new'){e.preventDefault();var b=document.querySelector('[data-act="mail-add"]');if(b)b.click()}
+  if(e.key==='Escape') closeGoMenu();
+});
 
 /* ---------- eventos ---------- */
 document.addEventListener('change',function(e){
@@ -858,7 +957,8 @@ document.addEventListener('change',function(e){
     var k=t.name.slice(2), n=$('#n-'+k); if(n) n.hidden=(t.value==='bueno'); updChkCount();
   }
   if(t.name==='t-ctab'){var ot=document.querySelector('input[name="t-ctab"][value="otro"]');$('#n-ctab').hidden=!ot.checked}
-  if(/^ck-(chofer|peon|resp)-sel$/.test(t.id)){var o=$('#'+t.id.replace('-sel','-otro'));o.hidden=(t.value!=='__otro');if(!o.hidden)o.focus()}
+  if(t.id==='ck-veh'){selectVeh(t.value);render(true)}
+  if(/^ck-(chofer|peon)-sel$/.test(t.id)){var o=$('#'+t.id.replace('-sel','-otro'));o.hidden=(t.value!=='__otro');if(!o.hidden)o.focus()}
   if(t.id==='kmVeh'){ui.newVeh=null;ui.sel=t.value;ui.edit=null;ui.addHist=false;ui.addPend=false;ui.lastKmWarn=null;render(true)}
 });
 document.addEventListener('input',function(e){
@@ -876,7 +976,7 @@ $('#kmForm').addEventListener('submit',function(e){
   var c=curKm(id);
   if(c&&km<c.km&&d>=c.d&&!(ui.lastKmWarn&&ui.lastKmWarn.ok===km+'|'+id)){
     ui.lastKmWarn={id:id,ok:km+'|'+id,msg:'Ese kilometraje ('+fmt(km)+') es menor que el último registrado ('+fmt(c.km)+'). Si es correcto, toca Guardar de nuevo.'};
-    $('#kmHint').textContent=ui.lastKmWarn.msg; $('#kmHint').classList.add('warnbox'); return;
+    $('#kmWarn').textContent=ui.lastKmWarn.msg; $('#kmWarn').hidden=false; return;
   }
   ui.lastKmWarn=null;
   mutKm(id,function(dd){dd.entries.push({id:uid('k'),d:d,km:km})});
@@ -888,8 +988,8 @@ document.addEventListener('submit',function(e){
   if(e.target.id!=='chkForm') return;
   e.preventDefault();
   var id=ui.sel, v=S.veh[id]; if(!v) return;
-  var km=parseInt($('#ck-km').value,10), chofer=getPerson('ck-chofer'), peoneta=getPerson('ck-peon'), resp=getPerson('ck-resp'), fecha=$('#ck-fecha').value;
-  if(!(km>=0)||!chofer||!resp||!fecha){toast('Completa kilometraje, chofer y responsable de la inspección.','bad');return}
+  var km=parseInt($('#ck-km').value,10), chofer=getPerson('ck-chofer'), peoneta=getPerson('ck-peon'), fecha=$('#ck-fecha').value;
+  if(!(km>=0)||!chofer||!fecha){toast('Completa el kilometraje y el nombre del chofer.','bad');return}
   var items={}, notas={}, fails=[];
   chkKeys().forEach(function(k){
     var r=document.querySelector('input[name="r-'+k+'"]:checked'); items[k]=r?r.value:null;
@@ -904,38 +1004,65 @@ document.addEventListener('submit',function(e){
     ui.chkKmOk=km+'|'+id; toast('El kilometraje ('+fmt(km)+') es menor que el último registrado ('+fmt(c0.km)+'). Si es correcto, toca Guardar de nuevo.','bad'); return;
   }
   ui.chkKmOk=null;
-  var cid=uid('c'), fotos={};
-  Object.keys(ui.photos).forEach(function(k){
-    var L=ui.photos[k]; if(!L||!L.length) return;
-    fotos[k]=L.map(function(f){var pid=uid('f'); S.fotoD[pid]=f.d; persist('fotos/'+pid,{cid:cid,vid:id,key:k,d:f.d},true); return pid});
-  });
-  var doc={vid:id,fecha:fecha,km:km,chofer:chofer,peoneta:peoneta,resp:resp,items:items,notas:notas,obs:$('#ck-obs').value.trim(),at:Date.now()};
-  if(Object.keys(fotos).length) doc.fotos=fotos;
-  S.chk[cid]=doc; persist('checklists/'+cid,doc,true);
-  clearPhotos();
-  var c=curKm(id);
-  if(!c||c.km!==km||c.d!==fecha) mutKm(id,function(d){d.entries.push({id:uid('k'),d:fecha,km:km,nota:'Checklist · '+chofer})});
-  if($('#ck-topend').checked&&fails.length) mutVeh(id,['pending'],function(d){fails.forEach(function(f){d.pending.push({id:uid('p'),text:'Checklist '+fecha.split('-').reverse().join('-')+': '+f})})});
-  chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});var n=$('#n-'+k);n.value='';n.hidden=true});
-  clearTestigos();
-  if($('#ck-savenames').checked){
-    var nuevos=[chofer,peoneta,resp].filter(function(n,i,a){return n&&S.people.indexOf(n)<0&&a.indexOf(n)===i});
-    if(nuevos.length){S.people=S.people.concat(nuevos);persist('settings/personal',{names:S.people},true)}
-  }
-  ['ck-chofer','ck-peon'].forEach(function(p){$('#'+p+'-sel').value='';$('#'+p+'-otro').value='';$('#'+p+'-otro').hidden=true});
-  $('#ck-obs').value=''; $('#ck-km').value=''; updChkCount();
-  var msT=mantSt(Object.assign({id:id},S.veh[id]));
-  toast('Checklist guardado · kilometraje '+fmt(km)+' registrado'+(msT.s==='warn'?' · '+msT.txt+' para la mantención':msT.s==='bad'?' · la mantención ya pasó':'')+(fails.length?' · '+fails.length+' punto(s) malo(s) pasaron a pendientes':''));
-  render(true);
+  var fotos={}; Object.keys(ui.photos).forEach(function(k){var L=ui.photos[k]; if(L&&L.length) fotos[k]=L.map(function(f){return f.d})});
+  var payload={vid:id,fecha:fecha,km:km,chofer:chofer,peoneta:peoneta,items:items,notas:notas,obs:$('#ck-obs').value.trim(),fotos:fotos,pendientes:$('#ck-topend').checked?fails:[],guardarNombres:$('#ck-savenames').checked};
+  var btn=e.target.querySelector('button[type="submit"]'), errT='No se pudo guardar el checklist. Revisa tu conexión e intenta de nuevo.';
+  btn.disabled=true; btn.textContent='Guardando…';
+  fetch('/api/checklist',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(function(r){
+    if(r.status===401){location.href='/login.html';return new Promise(function(){})}
+    return r.json().catch(function(){return {}}).then(function(j){return {ok:r.ok,j:j}});
+  }).then(function(x){
+    btn.disabled=false; btn.textContent='Guardar checklist';
+    if(!x.ok){toast(x.j.error||errT,'bad');return}
+    chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});var n=$('#n-'+k);n.value='';n.hidden=true});
+    clearTestigos(); clearPhotos();
+    ['ck-chofer','ck-peon'].forEach(function(p){$('#'+p+'-sel').value='';$('#'+p+'-otro').value='';$('#'+p+'-otro').hidden=true});
+    $('#ck-obs').value=''; $('#ck-km').value=''; updChkCount();
+    var msT=mantSt(Object.assign({id:id},S.veh[id]));
+    toast('Checklist guardado · kilometraje '+fmt(km)+' registrado'+(msT.s==='warn'?' · '+msT.txt+' para la mantención':msT.s==='bad'?' · la mantención ya pasó':'')+(payload.pendientes.length?' · '+payload.pendientes.length+' punto(s) malo(s) pasaron a pendientes':''));
+    window.scrollTo({top:0,behavior:'smooth'}); render(true);
+  },function(){btn.disabled=false;btn.textContent='Guardar checklist';toast(errT,'bad')});
 });
 
+function selectVeh(id){
+  if(chkBuilt){clearPhotos();chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});$('#n-'+k).hidden=true});clearTestigos();$('#ck-km').value='';updChkCount()}
+  ui.newVeh=null; ui.sel=id; ui.edit=null; ui.addHist=false; ui.addPend=false; ui.confirm=null; ui.lastKmWarn=null; ui.filter=''; ui.kmAll=false;
+}
+function closeGoMenu(){var m=$('#goMenu'); if(m&&!m.hidden){m.hidden=true;$('#goChk').setAttribute('aria-expanded','false')}}
+function toggleGoMenu(){
+  var m=$('#goMenu'), btn=$('#goChk');
+  if(!m.hidden){closeGoMenu();return}
+  var vs=vlist();
+  m.innerHTML='<div class="gh">Elige el vehículo</div>'+(vs.length?vs.map(function(v){return '<button type="button" role="menuitem" data-act="gochk" data-id="'+esc(v.id)+'"><span>'+esc(shortName(v))+'</span><span class="plate">'+esc(v.patente)+'</span></button>'}).join(''):'<div class="gh">Cargando vehículos…</div>');
+  m.hidden=false; btn.setAttribute('aria-expanded','true');
+  var f=m.querySelector('button'); if(f) f.focus();
+}
 document.addEventListener('click',function(e){
+  if(!e.target.closest('.gowrap')) closeGoMenu();
   var b=e.target.closest('[data-act]'); if(!b) return;
   var act=b.dataset.act, id=b.dataset.id, v=S.veh[ui.sel], vid=ui.sel;
   function num(x){var n=parseInt(x,10);return isNaN(n)?null:n}
   switch(act){
     case 'tab': ui.newVeh=null; ui.tab=b.dataset.tab; ui.edit=null; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
-    case 'sel': if(chkBuilt)clearPhotos(); ui.newVeh=null; ui.sel=id; ui.edit=null; ui.addHist=false; ui.addPend=false; ui.confirm=null; ui.lastKmWarn=null; ui.filter=''; ui.kmAll=false; if(chkBuilt){chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});$('#n-'+k).hidden=true});clearTestigos();updChkCount()} render(true); break;
+    case 'sel': selectVeh(id); render(true); break;
+    case 'gomenu': toggleGoMenu(); break;
+    case 'gochk': closeGoMenu(); selectVeh(id); ui.tab='chk'; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
+    case 'chk-go': selectVeh(b.dataset.vid); ui.tab='chk'; ui.chkOpen=id; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
+    case 'recent-more': ui.recentAll=!ui.recentAll; render(true); break;
+    /* otros repuestos */
+    case 'rep-addt': ui.repAdd=!ui.repAdd; ui.repEdit=null; ui.confirm=null; render(true); if(ui.repAdd&&$('#rp-nombre'))$('#rp-nombre').focus(); break;
+    case 'rep-add':
+      var rn=$('#rp-nombre').value.trim(); if(!rn){toast('Escribe el nombre del repuesto.','bad');return}
+      var rc=Math.max(0,parseFloat($('#rp-cant').value)||0), ru=($('#rp-unid').value||'').trim()||'unidades', rt=$('#rp-nota').value.trim();
+      ui.repAdd=false; mutRep(function(d){d.items.push({id:uid('r'),nombre:rn,cant:rc,unid:ru,nota:rt})}); toast('Repuesto agregado: '+rn); break;
+    case 'rep-edit': ui.repEdit=id; ui.repAdd=false; ui.confirm=null; render(true); break;
+    case 'rep-save':
+      var en=$('#er-nombre').value.trim(); if(!en){toast('El repuesto necesita un nombre.','bad');return}
+      var ec=Math.max(0,parseFloat($('#er-cant').value)||0), eu=($('#er-unid').value||'').trim(), et=$('#er-nota').value.trim();
+      ui.repEdit=null; mutRep(function(d){d.items.forEach(function(r){if(r.id===id){r.nombre=en;r.cant=ec;r.unid=eu;r.nota=et}})}); break;
+    case 'rep-inc': case 'rep-dec': var dl=act==='rep-inc'?1:-1; mutRep(function(d){d.items.forEach(function(r){if(r.id===id)r.cant=Math.max(0,r2((Number(r.cant)||0)+dl))})}); break;
+    case 'rep-del': ui.confirm=null; mutRep(function(d){d.items=d.items.filter(function(r){return r.id!==id})}); toast('Repuesto borrado'); break;
     case 'veh-new': ui.newVeh={}; ui.tab='veh'; ui.edit=null; ui.confirm=null; render(true); window.scrollTo({top:0,behavior:'smooth'}); if($('#nv-nombre'))$('#nv-nombre').focus(); break;
     case 'veh-create':
       var nvn=$('#nv-nombre').value.trim(), nvp=$('#nv-pat').value.trim().toUpperCase().replace(/[\s-]/g,'');
@@ -956,7 +1083,7 @@ document.addEventListener('click',function(e){
       if(db){db.doc('vehicles/'+did).delete().catch(function(er){toast(errMsg(er),'bad')}); db.doc('kmlog/'+did).delete().catch(function(){})}
       render(true); toast('Vehículo eliminado: '+dn); break;
     case 'open': ui.newVeh=null; ui.sel=id; ui.tab='veh'; ui.edit=null; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
-    case 'cancel': ui.newVeh=null; ui.edit=null; ui.confirm=null; ui.addHist=false; ui.addPend=false; render(true); break;
+    case 'cancel': ui.newVeh=null; ui.edit=null; ui.confirm=null; ui.addHist=false; ui.addPend=false; ui.repAdd=false; ui.repEdit=null; render(true); break;
     case 'ask': ui.confirm=b.dataset.key; render(true); break;
     case 'kmall': ui.kmAll=!ui.kmAll; render(true); break;
     /* pendientes */
@@ -1025,14 +1152,21 @@ document.addEventListener('click',function(e){
     case 'foto-zoom': var lb=document.createElement('div'); lb.className='lightbox'; lb.innerHTML='<img alt="Foto ampliada">'; lb.firstChild.src=b.src; lb.onclick=function(){lb.remove()}; document.body.appendChild(lb); break;
     /* alertas */
     case 'cfg-save':
-      var cfg={email:$('#cf-email').value.trim(),mantOn:$('#cf-mant').checked,mantKm:Math.max(100,num($('#cf-km').value)||1000),rtOn:$('#cf-rt').checked,permOn:$('#cf-per').checked};
-      S.cfg=cfg; persist('settings/alerts',cfg,true); render(true); toast('Configuración guardada'); break;
+      var np=takeNewEmails(); if(np===false) return;
+      S.cfg=readCfg(np); persist('settings/alerts',S.cfg,true); render(true); toast('Configuración guardada'); break;
+    case 'mail-add':
+      var np2=takeNewEmails(); if(np2===false) return;
+      if(!np2.length){toast('Escribe un correo.','bad');return}
+      S.cfg=readCfg(np2); persist('settings/alerts',S.cfg,true); render(true); toast('Correo agregado: '+np2.join(', ')); break;
+    case 'mail-del':
+      var di=parseInt(b.dataset.i,10), cur0=readCfg([]); cur0.emails=cur0.emails.filter(function(_,i){return i!==di});
+      S.cfg=cur0; persist('settings/alerts',S.cfg,true); render(true); toast('Correo quitado'); break;
     case 'mail-send':
       b.disabled=true;
       fetch('/api/alerts/send',{method:'POST',credentials:'same-origin'}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){b.disabled=false; toast(x.ok?'Correo enviado a '+x.j.to+' ('+x.j.alerts+' alertas)':(x.j.error||'No se pudo enviar'),x.ok?null:'bad')},function(){b.disabled=false;toast('No se pudo enviar el correo.','bad')});
       break;
     case 'copymail':
-      var m=alertMessage(), text='Para: '+(S.cfg.email||'')+'\nAsunto: '+m.subject+'\n\n'+m.body;
+      var m=alertMessage(), text='Para: '+((S.cfg.emails||[]).join(', '))+'\nAsunto: '+m.subject+'\n\n'+m.body;
       var fallback=function(){var el=$('#mailBody');var r=document.createRange();r.selectNodeContents(el);var s=window.getSelection();s.removeAllRanges();s.addRange(r);toast('Texto seleccionado. Copia con Ctrl+C.')};
       try{navigator.clipboard.writeText(text).then(function(){toast('Mensaje copiado')},fallback)}catch(er){fallback()} break;
   }
@@ -1050,14 +1184,22 @@ function snapColl(name,key){
 }
 function start(){
   if(!window.claude||!window.claude.use){$('#sync').textContent='Esta página necesita abrirse desde Claude para guardar datos.';return}
-  window.claude.use('db').then(function(d){
+  Promise.all([window.claude.use('db'),window.NDM_ME_P||Promise.resolve(null)]).then(function(r){
+    var d=r[0], me=r[1];
     if(!d){$('#sync').textContent='No se pudo conectar con el almacenamiento.';$('#p-veh').innerHTML='<div class="card"><p class="empty">No se pudo conectar con los datos guardados. Recarga la página.</p></div>';return}
     db=d;
+    ui.role=me?me.role:null;
+    var chofer=ui.role==='chofer';
+    if(chofer){document.body.classList.add('solo','chofer'); $('#soloOff').hidden=true; ui.tab='chk'}
     unsub.push(snapColl('vehicles','veh'));
     unsub.push(snapColl('kmlog','km'));
-    unsub.push(snapColl('checklists','chk'));
     unsub.push(db.doc('settings/personal').onSnapshot(function(s){ S.people=(s.exists&&s.data().names)||[]; render(false)},function(){}));
-    unsub.push(db.doc('settings/alerts').onSnapshot(function(s){ if(s.exists) S.cfg=Object.assign({email:'',mantOn:true,mantKm:1000,rtOn:true,permOn:true},s.data()); render(false)},function(){}));
+    if(chofer){render(true);return} // el chofer solo ve el checklist: no se cargan checklists, alertas ni repuestos
+    unsub.push(snapColl('checklists','chk'));
+    unsub.push(db.doc('settings/alerts').onSnapshot(function(s){
+      if(s.exists){ S.cfg=Object.assign({emails:[],mantOn:true,mantKm:1000,rtOn:true,permOn:true},s.data()); if(!Array.isArray(S.cfg.emails)||!S.cfg.emails.length) S.cfg.emails=S.cfg.email?[S.cfg.email]:[]; }
+      render(false)},function(){}));
+    unsub.push(db.doc('settings/repuestos').onSnapshot(function(s){ S.rep={items:(s.exists&&s.data().items)||[]}; render(false)},function(){}));
   });
 }
 if(/checklist/i.test(location.hash||'')){document.body.classList.add('solo');ui.tab='chk';$('#soloOff').hidden=false;$('#soloOff').onclick=function(){document.body.classList.remove('solo');$('#soloOff').hidden=true;ui.tab='veh';render(true)}}
