@@ -71,9 +71,10 @@ function validate(req, res) {
   return true;
 }
 /* El chofer solo lee lo mínimo para llenar el checklist: nombre y patente de los vehículos, su último
-   kilometraje y la lista de nombres. Nada más (ni papeles, ni historial, ni otros checklists). */
-function forChofer(col, id, data) {
-  if (col === 'vehicles') return { nombre: data.nombre, patente: data.patente, order: data.order };
+   kilometraje, la lista de nombres y, de cada vehículo, un aviso de si tiene mantención o documentos por vencer
+   o vencidos (solo el resultado: tipo y texto, sin fechas ni historial). Nada más (ni papeles, ni historial, ni otros checklists). */
+function forChofer(col, id, data, alertas) {
+  if (col === 'vehicles') return { nombre: data.nombre, patente: data.patente, order: data.order, alertas: alertas || [] };
   if (col === 'kmlog') {
     let last = null; ((data && data.entries) || []).forEach((x) => { if (!last || x.d >= last.d) last = x; });
     return { entries: last ? [last] : [] };
@@ -81,18 +82,26 @@ function forChofer(col, id, data) {
   if (col === 'settings' && id === 'personal') return data;
   return undefined;
 }
+/* Alertas activas por vehículo, en versión breve, para la pantalla del chofer. */
+async function alertasPorVehiculo() {
+  const { alerts: al } = await alerts.buildAlerts(new Date(), true);
+  const m = {};
+  al.forEach((a) => { (m[a.vid] = m[a.vid] || []).push({ kind: a.kind, s: a.s, txt: a.brief || a.txt }); });
+  return m;
+}
 app.get('/api/col/:col', needUser, wrap(async (req, res) => {
   if (!auth.COLS.has(req.params.col)) return res.status(400).json({ error: 'Ruta inválida' });
   const rows = await store.list(req.params.col);
   if (req.user.role !== 'chofer') return res.json(rows);
-  res.json(rows.map((r) => ({ id: r.id, data: forChofer(req.params.col, r.id, r.data) })).filter((r) => r.data !== undefined));
+  const am = req.params.col === 'vehicles' ? await alertasPorVehiculo() : {};
+  res.json(rows.map((r) => ({ id: r.id, data: forChofer(req.params.col, r.id, r.data, am[r.id]) })).filter((r) => r.data !== undefined));
 }));
 app.get('/api/doc/:col/:id', needUser, wrap(async (req, res) => {
   if (!validate(req, res)) return;
   const chofer = req.user.role === 'chofer';
   if (chofer && forChofer(req.params.col, req.params.id, {}) === undefined) return res.status(403).json({ error: 'Sin permiso' });
   let d = await store.get(req.params.col, req.params.id);
-  if (chofer && d != null) d = forChofer(req.params.col, req.params.id, d);
+  if (chofer && d != null) d = forChofer(req.params.col, req.params.id, d, req.params.col === 'vehicles' ? (await alertasPorVehiculo())[req.params.id] : undefined);
   if (d == null) return res.status(404).json({ error: 'No existe' });
   res.json({ data: d });
 }));
