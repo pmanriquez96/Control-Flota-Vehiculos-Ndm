@@ -271,9 +271,9 @@ var MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic
 var CHK=[
  {t:'Documentación',i:[['perm','Permiso de circulación'],['rt','Revisión técnica'],['soap','SOAP']]},
  {t:'Luces',i:[['lbaja','Luces bajas'],['lalta','Luces altas'],['linter','Intermitentes'],['lfreno','Luces de freno'],['lretro','Luz de retroceso'],['lpat','Luz de patente']]},
- {t:'Neumáticos y ruedas',i:[['ndel','Neumáticos delanteros'],['ntra','Neumáticos traseros'],['npres','Presión de aire'],['nrep','Rueda de repuesto']]},
- {t:'Motor y niveles',i:[['maceite','Nivel de aceite de motor'],['mrefri','Nivel de refrigerante'],['mfreno','Líquido de frenos'],['mfuga','Fugas visibles']]},
- {t:'Cabina y carrocería',i:[['cpara','Parabrisas'],['climp','Plumillas'],['cespe','Espejos'],['cboc','Bocina'],['ctab','Testigos encendidos en tablero'],['climpi','Limpieza de cabina y exterior']]},
+ {t:'Neumáticos y ruedas',i:[['ndel','Neumáticos delanteros'],['ntra','Neumáticos traseros'],['nrep','Rueda de repuesto']]},
+ {t:'Motor y niveles',i:[['maceite','Nivel de aceite de motor'],['mrefri','Nivel de refrigerante'],['mfreno','Líquido de frenos']]},
+ {t:'Cabina y carrocería',i:[['cpara','Parabrisas'],['climp','Plumillas'],['cespe','Espejos'],['cboc','Bocina'],['ctab','Testigos encendidos en tablero']]},
  {t:'Kit de seguridad',i:[['kext','Extintor vigente y cargado'],['ktri','Triángulos de seguridad'],['kchal','Chaleco reflectante'],['kbot','Botiquín de primeros auxilios'],['kgata','Gata'],['kllave','Llave de ruedas']]}
 ];
 var CHKMULTI={ctab:[['check','Check Engine'],['abs','Abs'],['airbag','Airbag'],['otro','Otro']]};
@@ -355,7 +355,7 @@ function mantSt(v){
   if(rem<=thr) return {s:'warn',txt:'Faltan '+fmt(rem)+' km',rem:rem};
   return {s:'ok',txt:'Faltan '+fmt(rem)+' km',rem:rem};
 }
-function dueSt(m,dia){
+function dueSt(m,dia,urg){
   if(!m) return {s:'none',txt:'Sin fecha'};
   var p=m.split('-').map(Number), y=p[0], mo=p[1];
   var t=new Date(); t=new Date(t.getFullYear(),t.getMonth(),t.getDate());
@@ -363,12 +363,19 @@ function dueSt(m,dia){
   var lastPrev=new Date(y,mo-1,0); var start=new Date(lastPrev.getFullYear(),lastPrev.getMonth(),lastPrev.getDate()-6);
   var lab=(dia?dia+' ':'')+mlab(m);
   if(t>end) return {s:'bad',txt:'Vencido',lab:lab,start:start};
+  if(urg){var us=new Date(end.getFullYear(),end.getMonth(),end.getDate()-urg); if(t>=us) return {s:'bad',urgent:true,txt:'Urgente',lab:lab,start:start,left:Math.round((end-t)/864e5)}}
   if(t>=start) return {s:'warn',txt:'Renovar',lab:lab,start:start};
   return {s:'ok',txt:'Vigente',lab:lab,start:start};
 }
+/* Revisión técnica: pasa a URGENTE 7 días antes de que termine el mes (o del día indicado). Igual en lib/alerts.js. */
+function rtSt(v){return dueSt(v.rt,v.rtDia,7)}
+function dueTxt(st){
+  if(st.s==='bad'&&st.urgent) return 'vence '+st.lab+' · URGENTE: '+(st.left<=0?'vence hoy':'quedan '+st.left+(st.left===1?' día':' días'));
+  return (st.s==='bad'?'vencida desde ':'vence ')+st.lab;
+}
 function pill(st,txt){return '<span class="pill '+st.s+'">'+esc(txt||st.txt)+'</span>'}
 function worst(list){var o={bad:3,warn:2,ok:1,none:0},w='ok';list.forEach(function(s){if(o[s]>o[w])w=s});return w}
-function vehStatus(v){return worst([mantSt(v).s,dueSt(v.rt,v.rtDia).s,dueSt(v.permiso).s].map(function(x){return x==='none'?'ok':x}))}
+function vehStatus(v){return worst([mantSt(v).s,rtSt(v).s,dueSt(v.permiso).s].map(function(x){return x==='none'?'ok':x}))}
 function buildAlerts(all){
   var out=[];
   vlist().forEach(function(v){
@@ -377,9 +384,9 @@ function buildAlerts(all){
       out.push({v:v,kind:'Mantención',s:ms.s,txt:ms.s==='bad'?'pasó el kilometraje de la próxima mantención por '+fmt(-ms.rem)+' km (actual '+fmt(c.km)+' km, próxima '+fmt(v.nextKm)+' km)':'faltan '+fmt(ms.rem)+' km (actual '+fmt(c.km)+' km, próxima '+fmt(v.nextKm)+' km)'});
     }
     [['rt','Revisión técnica',v.rt,v.rtDia,'rtOn'],['perm','Permiso de circulación',v.permiso,null,'permOn']].forEach(function(x){
-      var st=dueSt(x[2],x[3]);
+      var st=dueSt(x[2],x[3],x[0]==='rt'?7:0);
       if((all||S.cfg[x[4]])&&(st.s==='warn'||st.s==='bad')){
-        out.push({v:v,kind:x[1],s:st.s,txt:(st.s==='bad'?'vencida desde ':'vence ')+st.lab.replace(/^\d+ /,function(d){return d})});
+        out.push({v:v,kind:x[1],s:st.s,txt:dueTxt(st)});
       }
     });
   });
@@ -587,7 +594,7 @@ function renderVeh(){
   if(ui.newVeh){el.innerHTML=formNewVeh();return}
   if(!v){el.innerHTML='<div class="card"><p class="empty">'+(ui.loaded.veh?'No hay vehículos cargados todavía.':'Cargando datos de la flota…')+'</p></div>';return}
   v=Object.assign({id:ui.sel},v);
-  var c=curKm(v.id), ms=mantSt(v), rt=dueSt(v.rt,v.rtDia), pe=dueSt(v.permiso);
+  var c=curKm(v.id), ms=mantSt(v), rt=rtSt(v), pe=dueSt(v.permiso);
   var h='<div class="vhead"><h2>'+esc(v.nombre)+'</h2><span class="plate">'+esc(v.patente)+'</span></div>';
   h+='<div class="tiles" style="margin-block:12px">'+
     '<div class="tile"><span class="lab">Kilometraje actual</span><span class="big">'+(c?fmt(c.km):'—')+'</span><span class="hint">'+(c?'registrado el '+c.d.split('-').reverse().join('-'):'sin registro')+'</span></div>'+
@@ -670,12 +677,21 @@ function cardStock(v){
     h+='<li><span>'+esc(it[1])+'</span><span>'+stockTxt(v,k,st[k])+'</span><span class="tick'+(on?' on':'')+'" role="img" aria-label="'+(on?'Cambiado en la última mantención':'No cambiado en la última mantención')+'">'+(on?'✓':'')+'</span>'+
       '<span class="stk-l">'+(lc?'Último cambio: '+esc(mlab(lc.month))+(lc.km!=null?' · '+fmt(lc.km)+' km':''):'Sin cambios anotados')+'</span></li>';
   });
-  h+='</ul><details style="margin-top:10px"><summary>Ingresar compra de repuestos</summary><div class="form" style="margin-top:8px"><label class="field"><span>Repuesto</span><select id="stk-item">'+ITEMS.map(function(it){return '<option value="'+it[0]+'">'+esc(it[1])+'</option>'}).join('')+'</select></label>'+fld('stk-qty','Cantidad que ingresa','','number','min="0" step="0.1" inputmode="decimal"')+'<button class="btn pri" data-act="stk-add">Sumar al stock</button></div></details>';
+  h+='</ul>';
   return h+'</section>';
+}
+/* Ingreso de compra de repuestos: elige vehículo, repuesto y cantidad, y se suma a su stock. */
+function buyHtml(vs){
+  var open=!!ui.stkBuy, veh=ui.stkVeh&&S.veh[ui.stkVeh]?ui.stkVeh:ui.sel, item=ui.stkItem||ITEMS[0][0];
+  var h='<section class="card" style="margin-bottom:16px"><header><h3>Ingresar compra de repuestos</h3><button class="btn sm pri" data-act="stk-buy">'+(open?'Cerrar':'+ Ingresar compra')+'</button></header>';
+  if(!open) return h+'<p class="hint">Suma filtros o aceite al stock de un vehículo cuando llegan.</p></section>';
+  return h+'<div class="form"><label class="field"><span>Vehículo</span><select id="stk-veh">'+vs.map(function(v){return '<option value="'+esc(v.id)+'"'+(v.id===veh?' selected':'')+'>'+esc(shortName(v))+' · '+esc(v.patente)+'</option>'}).join('')+'</select></label>'+
+    '<label class="field"><span>Repuesto</span><select id="stk-item">'+ITEMS.map(function(it){return '<option value="'+it[0]+'"'+(it[0]===item?' selected':'')+'>'+esc(it[1])+'</option>'}).join('')+'</select></label>'+
+    fld('stk-qty','Cantidad que ingresa','','number','min="0" step="0.1" inputmode="decimal"')+'<button class="btn pri" data-act="stk-add">Sumar al stock</button></div></section>';
 }
 function renderStockTab(){
   var vs=vlist();
-  var h='<h3 style="margin:0 0 8px">Filtros y aceite por vehículo</h3><div class="tablewrap"><table><thead><tr><th>Vehículo</th>'+ITEMS.map(function(it){return '<th>'+esc(it[1])+'</th>'}).join('')+'<th>Última mantención</th></tr></thead><tbody>';
+  var h=buyHtml(vs)+'<h3 style="margin:0 0 8px">Filtros y aceite por vehículo</h3><div class="tablewrap"><table><thead><tr><th>Vehículo</th>'+ITEMS.map(function(it){return '<th>'+esc(it[1])+'</th>'}).join('')+'<th>Última mantención</th></tr></thead><tbody>';
   vs.forEach(function(v){
     var st=v.stock||{}, info=stockInfo(v), L=info.latest;
     h+='<tr><td><button class="rowbtn" data-act="open" data-id="'+v.id+'"><b>'+esc(shortName(v))+'</b><span class="plate">'+esc(v.patente)+'</span></button></td>'+
@@ -686,7 +702,7 @@ function renderStockTab(){
 }
 
 function cardPap(v){
-  var rt=dueSt(v.rt,v.rtDia), pe=dueSt(v.permiso), ex=dueSt(v.extintor);
+  var rt=rtSt(v), pe=dueSt(v.permiso), ex=dueSt(v.extintor);
   var h='<section class="card a-pap"><header><h3>Papeles</h3>'+(ui.edit&&ui.edit.k==='pap'?'':'<button class="btn sm" data-act="pap-edit">Editar</button>')+'</header>';
   if(ui.edit&&ui.edit.k==='pap'){
     h+='<div class="form">'+fld('pp-nombre','Vehículo',v.nombre)+fld('pp-pat','Patente',v.patente)+
@@ -749,7 +765,7 @@ function renderFlota(){
   var vs=vlist();
   var h='<div class="tablewrap"><table><thead><tr><th>Vehículo</th><th>Km actual</th><th>Próxima mantención</th><th>Revisión técnica</th><th>Permiso circulación</th><th>Extintor</th><th>Trabajos pendientes</th></tr></thead><tbody>';
   vs.forEach(function(v){
-    var c=curKm(v.id), ms=mantSt(v), rt=dueSt(v.rt,v.rtDia), pe=dueSt(v.permiso), ex=dueSt(v.extintor);
+    var c=curKm(v.id), ms=mantSt(v), rt=rtSt(v), pe=dueSt(v.permiso), ex=dueSt(v.extintor);
     h+='<tr><td><button class="rowbtn" data-act="open" data-id="'+v.id+'"><b>'+esc(shortName(v))+'</b><span class="plate">'+esc(v.patente)+'</span></button></td>'+
       '<td>'+(c?fmt(c.km):'—')+'</td><td>'+fmt(v.nextKm)+'<span class="sub2">'+pill(ms)+'</span></td>'+
       '<td>'+esc(rt.lab||'—')+'<span class="sub2">'+pill(rt)+'</span></td><td>'+esc(pe.lab||'—')+'<span class="sub2">'+pill(pe)+'</span></td>'+
@@ -825,7 +841,7 @@ function renderAlertTab(){
       ((c.emails||[]).length?'<ul class="list" style="margin:6px 0">'+c.emails.map(function(m,i){return '<li><span class="grow">'+esc(m)+'</span><div class="acts"><button class="btn sm" data-act="mail-del" data-i="'+i+'">Quitar</button></div></li>'}).join('')+'</ul>':'<p class="empty" style="margin:6px 0">Todavía no hay correos. Agrega el primero.</p>')+
       '<div class="form" style="margin-top:6px"><label class="field"><span class="sr">Agregar correo</span><input id="cf-email-new" type="text" inputmode="email" autocomplete="off" placeholder="nombre@empresa.cl (puedes pegar varios separados por coma)"></label><button class="btn" data-act="mail-add">Agregar correo</button></div></div>'+
     '<div class="checkline"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></div>'+
-    '<div class="checkline"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior</label></div>'+
+    '<div class="checkline"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior; urgente y con correo diario desde 7 días antes de que termine el mes</label></div>'+
     '<div class="checkline"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
     '<div class="acts"><button class="btn pri" data-act="cfg-save">Guardar configuración</button></div></div></section>'+
     '<section class="card"><header><h3>Alertas activas ('+al.length+')</h3></header>'+
@@ -833,7 +849,7 @@ function renderAlertTab(){
   var mails=(c.emails||[]).join(', ');
   var mailto='mailto:'+encodeURIComponent(mails).replace(/%40/g,'@')+'?subject='+encodeURIComponent(m.subject)+'&body='+encodeURIComponent(m.body);
   h+='<section class="card" style="margin-top:16px"><header><h3>'+(window.NDM_SERVER?'Correo de alertas':'Correo listo para enviar')+'</h3></header>'+
-    (window.NDM_SERVER?'<p class="hint" style="margin-bottom:10px">El servidor revisa las alertas cada hora y envía el correo solo cuando aparece una alerta nueva (y lo repite cada 7 días mientras siga activa). También se revisa poco después de registrar un kilometraje. Los destinatarios son los correos de la lista de arriba.</p><div class="acts" style="margin-bottom:12px"><button class="btn pri" data-act="mail-send">Enviar las alertas ahora</button></div>':'<p class="hint" style="margin-bottom:10px">Esta página no envía correos sola. El mensaje se arma con las alertas marcadas arriba. Copia el texto o abre tu programa de correo. Si el enlace no abre nada, usa Copiar.</p>')+
+    (window.NDM_SERVER?'<p class="hint" style="margin-bottom:10px">El servidor revisa las alertas cada hora y envía el correo cuando aparece una alerta nueva (y lo repite cada 7 días mientras siga activa). Al registrar un kilometraje, la revisión se hace de inmediato. La revisión técnica urgente o vencida se recuerda todos los días a las 8:00. Los destinatarios son los correos de la lista de arriba.</p><div class="acts" style="margin-bottom:12px"><button class="btn pri" data-act="mail-send">Enviar las alertas ahora</button></div>':'<p class="hint" style="margin-bottom:10px">Esta página no envía correos sola. El mensaje se arma con las alertas marcadas arriba. Copia el texto o abre tu programa de correo. Si el enlace no abre nada, usa Copiar.</p>')+
     '<p><b>Para:</b> <span id="mailTo">'+esc(mails||'(agrega al menos un correo arriba)')+'</span></p><p><b>Asunto:</b> <span id="mailSub">'+esc(m.subject)+'</span></p>'+
     '<div class="msg" id="mailBody" style="margin-block:10px">'+esc(m.body)+'</div>'+
     '<div class="acts"><button class="btn pri" data-act="copymail">Copiar mensaje</button><a class="btn" style="display:inline-flex;align-items:center;text-decoration:none" href="'+esc(mailto)+'">Abrir en mi correo</a></div></section>';
@@ -987,6 +1003,8 @@ document.addEventListener('change',function(e){
   }
   if(t.name==='t-ctab'){var ot=document.querySelector('input[name="t-ctab"][value="otro"]');$('#n-ctab').hidden=!ot.checked}
   if(t.id==='ck-veh'){selectVeh(t.value);render(true)}
+  if(t.id==='stk-veh') ui.stkVeh=t.value;
+  if(t.id==='stk-item') ui.stkItem=t.value;
   if(/^ck-(chofer|peon)-sel$/.test(t.id)){var o=$('#'+t.id.replace('-sel','-otro'));o.hidden=(t.value!=='__otro');if(!o.hidden)o.focus()}
   if(t.id==='kmVeh'){ui.newVeh=null;ui.sel=t.value;ui.edit=null;ui.addHist=false;ui.addPend=false;ui.lastKmWarn=null;render(true)}
 });
@@ -1232,10 +1250,12 @@ document.addEventListener('click',function(e){
       var sv2={}; ITEMS.forEach(function(it){var x=$('#sk-'+it[0]).value; sv2[it[0]]=(x===''?null:Math.max(0,parseFloat(x)))});
       var uso2=Math.max(0,parseFloat($('#sk-uso').value))||1, un2=($('#sk-unid').value||'').trim()||'bidones';
       ui.edit=null; mutVeh(vid,['stock','aceiteUso','aceiteUnidad'],function(d){d.stock=Object.assign(d.stock||{},sv2); d.aceiteUso=uso2; d.aceiteUnidad=un2}); toast('Stock guardado'); break;
+    case 'stk-buy': ui.stkBuy=!ui.stkBuy; render(true); if(ui.stkBuy&&$('#stk-qty'))$('#stk-qty').focus(); break;
     case 'stk-add':
-      var sk=$('#stk-item').value, q=parseFloat($('#stk-qty').value); if(!(q>0)){toast('Escribe la cantidad que ingresa.','bad');return}
-      mutVeh(vid,['stock'],function(d){d.stock=d.stock||{}; d.stock[sk]=r2((d.stock[sk]==null?0:d.stock[sk])+q)});
-      toast('Stock actualizado: '+ITEMS.filter(function(i){return i[0]===sk})[0][1]+' +'+fmt(q)); break;
+      var sv=$('#stk-veh').value, sk=$('#stk-item').value, q=parseFloat($('#stk-qty').value); if(!(q>0)){toast('Escribe la cantidad que ingresa.','bad');return}
+      ui.stkVeh=sv; ui.stkItem=sk;
+      mutVeh(sv,['stock'],function(d){d.stock=d.stock||{}; d.stock[sk]=r2((d.stock[sk]==null?0:d.stock[sk])+q)});
+      toast('Stock actualizado: '+shortName(S.veh[sv])+' · '+ITEMS.filter(function(i){return i[0]===sk})[0][1]+' +'+fmt(q)); break;
     /* papeles */
     case 'pap-edit': ui.edit={k:'pap'}; render(true); break;
     case 'pap-save':
