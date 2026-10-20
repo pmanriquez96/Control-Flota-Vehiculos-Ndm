@@ -147,6 +147,12 @@ td .sub2{display:block;font-size:12.5px;color:var(--muted)}
 .msg{white-space:pre-wrap;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px;overflow-wrap:anywhere}
 .checkline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .checkline input[type=checkbox]{width:20px;height:20px}
+/* casilla + texto largo: la casilla queda al lado del texto aunque este ocupe varias líneas */
+.checkline.nw{flex-wrap:nowrap;align-items:flex-start}
+.checkline.nw>input[type=checkbox]{flex:none;margin:1px 0 0}
+.checkline.nw>label,.checkline.nw>span{flex:1;min-width:0}
+.checkline .cl{display:flex;gap:8px;align-items:center}
+.checkline .cl>input[type=checkbox]{margin:1px 0 0}
 .checkline input[type=number]{width:110px;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface)}
 details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .solo .tabs,.solo #alertStrip,.solo .kmbar,.solo .gowrap,.solo #recent{display:none}
@@ -839,9 +845,9 @@ function renderAlertTab(){
     '<div class="field"><span>Correos que reciben las alertas ('+(c.emails||[]).length+')</span>'+
       ((c.emails||[]).length?'<ul class="list" style="margin:6px 0">'+c.emails.map(function(m,i){return '<li><span class="grow">'+esc(m)+'</span><div class="acts"><button class="btn sm" data-act="mail-del" data-i="'+i+'">Quitar</button></div></li>'}).join('')+'</ul>':'<p class="empty" style="margin:6px 0">Todavía no hay correos. Agrega el primero.</p>')+
       '<div class="form" style="margin-top:6px"><label class="field"><span class="sr">Agregar correo</span><input id="cf-email-new" type="text" inputmode="email" autocomplete="off" placeholder="nombre@empresa.cl (puedes pegar varios separados por coma)"></label><button class="btn" data-act="mail-add">Agregar correo</button></div></div>'+
-    '<div class="checkline"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></div>'+
-    '<div class="checkline"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior; urgente y con correo diario desde 7 días antes de que termine el mes</label></div>'+
-    '<div class="checkline"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
+    '<div class="checkline"><span class="cl"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label></span><span class="cl"><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></span></div>'+
+    '<div class="checkline nw"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior; urgente y con correo diario desde 7 días antes de que termine el mes</label></div>'+
+    '<div class="checkline nw"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
     '<div class="acts"><button class="btn pri" data-act="cfg-save">Guardar configuración</button></div></div></section>'+
     '<section class="card"><header><h3>Alertas activas ('+al.length+')</h3></header>'+
     (al.length?'<ul class="list">'+al.map(function(a){return '<li><span class="pill '+a.s+'">'+(a.s==='bad'?'Urgente':'Atención')+'</span><span class="grow"><b>'+esc(a.kind)+'</b> · '+esc(a.v.nombre)+' <span class="plate">'+esc(a.v.patente)+'</span><br>'+esc(a.txt)+'</span><button class="btn sm" data-act="open" data-id="'+a.v.id+'">Ver ficha</button></li>'}).join('')+'</ul>':'<p class="empty">No hay alertas activas.</p>')+'</section></div>';
@@ -887,7 +893,7 @@ function buildChkForm(){
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
    '<label class="field"><span>Kilometraje actual</span><input id="ck-km" type="number" inputmode="numeric" min="0" required></label>'+
    personField('ck-chofer','Nombre del chofer',false)+personField('ck-peon','Nombre del peoneta',true)+
-   '<label class="checkline full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
+   '<label class="checkline nw full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
    '<div class="acts" style="margin-bottom:12px"><button type="button" class="btn sm" data-act="chk-allbueno">Marcar todo Bueno</button><button type="button" class="btn sm" data-act="chk-clear">Limpiar</button><span class="hint" id="ck-count" style="align-self:center"></span></div>'+
    '<div style="display:flex;flex-direction:column;gap:12px">';
   CHK.forEach(function(s,si){
@@ -904,7 +910,7 @@ function buildChkForm(){
     h+='</div>';
   });
   h+='</div><label class="field" style="margin-top:14px"><span>Observaciones generales</span><textarea id="ck-obs"></textarea></label><div style="margin-top:6px">'+camBtn('obs','Tomar foto')+'<div class="thumbs" id="th-obs"></div></div>'+
-   '<div class="checkline" style="margin-top:12px"><input id="ck-topend" type="checkbox" checked><label for="ck-topend">Agregar los puntos en mal estado (Malo) a los trabajos pendientes del vehículo</label></div>'+
+   '<div class="checkline nw" style="margin-top:12px"><input id="ck-topend" type="checkbox" checked><label for="ck-topend">Agregar los puntos en mal estado (Malo) a los trabajos pendientes del vehículo</label></div>'+
    '<div class="acts" style="margin-top:14px"><button class="btn pri" type="submit">Guardar checklist</button></div></form></section><div id="chkList" style="margin-top:16px"></div>';
   $('#p-chk').innerHTML=h; chkBuilt=true;
   $('#ck-fecha').value=todayStr();
