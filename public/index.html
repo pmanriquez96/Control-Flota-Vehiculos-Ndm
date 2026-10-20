@@ -170,7 +170,7 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 #recent .rcl{max-height:300px;overflow-y:auto}
 @media (max-width:860px){.toprow{grid-template-columns:1fr}.toprow .kmbar form{grid-template-columns:1fr 1fr}.toprow .kmbar form .btn{grid-column:1/-1}}
 .gowrap{position:relative}
-#p-chk{scroll-margin-top:8px}
+#p-chk,#chkList li{scroll-margin-top:8px}
 .gomenu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:270px;max-width:88vw;max-height:70vh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
 .gomenu[hidden]{display:none}
 .gomenu .gh{font-size:12px;color:var(--muted);padding:6px 10px 4px}
@@ -938,7 +938,7 @@ function renderChkList(){
     if(open){
       det='<div style="flex-basis:100%">'+fotosGaleria(x)+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it);var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+'</div>';
     }
-    return '<li><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
+    return '<li id="chk-'+esc(x.id)+'"><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
       (fails.length?pill({s:'bad'},fails.length+(fails.length===1?' malo':' malos')):'')+(regs.length?pill({s:'warn'},regs.length+(regs.length===1?' regular':' regulares')):'')+(!fails.length&&!regs.length&&answered>0?pill({s:'ok'},'Todo bueno'):'')+(sinrev>0?pill({s:'none'},sinrev+' sin revisar'):'')+(nfot?pill({s:'none'},nfot+(nfot===1?' foto':' fotos')):'')+
       '<div class="acts"><button class="btn sm" data-act="chk-open" data-id="'+x.id+'">'+(open?'Ocultar':'Ver detalle')+'</button>'+(cf?'<button class="btn sm bad" data-act="chk-del" data-id="'+x.id+'">Sí, borrar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="chk'+x.id+'">Borrar</button>')+'</div>'+det+'</li>';
   }).join('')+'</ul>';
@@ -1158,7 +1158,7 @@ document.addEventListener('click',function(e){
     case 'q-drop': qDel(id).then(function(){renderQueueBar()}); break;
     case 'chk-toggle': ui.chkFormOpen=!ui.chkFormOpen; applyChkForm(); break;
     case 'gochk': closeGoMenu(); selectVeh(id); ui.tab='chk'; ui.chkFormOpen=true; render(true); $('#p-chk').scrollIntoView({behavior:'smooth',block:'start'}); break;
-    case 'chk-go': selectVeh(b.dataset.vid); ui.tab='chk'; ui.chkOpen=id; render(true); window.scrollTo({top:0,behavior:'smooth'}); break;
+    case 'chk-go': selectVeh(b.dataset.vid); ui.tab='chk'; ui.chkOpen=id; render(true); (document.getElementById('chk-'+id)||$('#p-chk')).scrollIntoView({behavior:'smooth',block:'start'}); break;
     case 'recent-more': ui.recentAll=!ui.recentAll; render(true); break;
     /* otros repuestos */
     case 'rep-addt': ui.repAdd=!ui.repAdd; ui.repEdit=null; ui.confirm=null; render(true); if(ui.repAdd&&$('#rp-nombre'))$('#rp-nombre').focus(); break;
