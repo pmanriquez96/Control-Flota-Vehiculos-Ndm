@@ -663,17 +663,10 @@ function cardHist(v){
 }
 
 function cardStock(v){
-  var st=v.stock||{}, info=stockInfo(v), L=info.latest, editing=ui.edit&&ui.edit.k==='stock';
+  var st=v.stock||{}, info=stockInfo(v), L=info.latest;
   var pol=(v.pauta||[]).filter(function(r){return r.k==='Cambio filtro de polen'})[0];
   var polNA=pol&&(pol.v==='No aplica'||pol.v==='—')&&st.polen==null&&!info.last.polen;
-  var h='<section class="card a-stock"><header><h3>Filtros y aceite</h3>'+(editing?'':'<button class="btn sm" data-act="stock-edit">Editar stock</button>')+'</header>';
-  if(editing){
-    h+='<div class="form">'+ITEMS.map(function(it){var k=it[0];return fld('sk-'+k,it[1]+(k==='aceite'?' (bidones)':' (unidades)'),st[k]==null?'':st[k],'number','min="0" step="'+(k==='aceite'?'0.1':'1')+'" inputmode="decimal"')}).join('')+
-      fld('sk-uso','Bidones de aceite que se descuentan por cambio',v.aceiteUso||1,'number','min="0" step="0.1"')+fld('sk-unid','Unidad del aceite',v.aceiteUnidad||'bidones')+
-      '<p class="hint full">Deje vacío el repuesto que no quiera controlar. El stock baja solo cuando anota el trabajo en el historial.</p>'+
-      '<div class="acts full"><button class="btn pri" data-act="stock-save">Guardar stock</button><button class="btn" data-act="cancel">Cancelar</button></div></div>';
-    return h+'</section>';
-  }
+  var h='<section class="card a-stock"><header><h3>Filtros y aceite</h3></header>';
   h+='<p class="hint" style="margin-bottom:8px">'+(L?'Última mantención con repuestos: <b>'+esc(mlab(L.month,true))+'</b>'+(L.km!=null?' · '+fmt(L.km)+' km':''):'Aún no hay repuestos anotados en el historial.')+'</p>';
   h+='<ul class="stk"><li class="hd"><span>Repuesto</span><span>Stock</span><span class="hd2">¿Cambió?</span></li>';
   ITEMS.forEach(function(it){
@@ -704,7 +697,7 @@ function renderStockTab(){
       ITEMS.map(function(it){var k=it[0];return '<td>'+(st[k]==null?'<span class="hint">—</span>':st[k]<=0?'<span class="pill bad">Sin stock</span>':'<b>'+fmt(st[k])+'</b>'+(k==='aceite'?' <span class="hint">'+esc(v.aceiteUnidad||'bidones')+'</span>':''))+'</td>'}).join('')+
       '<td>'+(L?esc(mlab(L.month))+'<span class="sub2">'+ITEMS.filter(function(it){return L.set[it[0]]}).map(function(it){return '✓ '+it[1].replace('Filtro de ','F. ').replace('Aceite de motor','Aceite')}).join(' · ')+'</span>':'—')+'</td></tr>';
   });
-  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para cargar o editar su stock.</p>'+repHtml();
+  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para ver su ficha. Para sumar repuestos que llegaron, use «Ingresar compra de repuestos», arriba.</p>'+repHtml();
 }
 
 function cardPap(v){
@@ -1266,11 +1259,6 @@ document.addEventListener('click',function(e){
       if(dsc2) toast('Trabajo actualizado'+stockMsg(v,us2,dsc2)); break;
     case 'hist-del': ui.confirm=null; mutVeh(vid,['history','stock'],function(d){var e=d.history.filter(function(h){return h.id===id})[0]; restoreStock(d,e); d.history=d.history.filter(function(h){return h.id!==id})}); break;
     /* stock */
-    case 'stock-edit': ui.edit={k:'stock'}; render(true); break;
-    case 'stock-save':
-      var sv2={}; ITEMS.forEach(function(it){var x=$('#sk-'+it[0]).value; sv2[it[0]]=(x===''?null:Math.max(0,parseFloat(x)))});
-      var uso2=Math.max(0,parseFloat($('#sk-uso').value))||1, un2=($('#sk-unid').value||'').trim()||'bidones';
-      ui.edit=null; mutVeh(vid,['stock','aceiteUso','aceiteUnidad'],function(d){d.stock=Object.assign(d.stock||{},sv2); d.aceiteUso=uso2; d.aceiteUnidad=un2}); toast('Stock guardado'); break;
     case 'stk-buy': ui.stkBuy=!ui.stkBuy; render(true); if(ui.stkBuy&&$('#stk-qty'))$('#stk-qty').focus(); break;
     case 'stk-add':
       var sv=$('#stk-veh').value, sk=$('#stk-item').value, q=parseFloat($('#stk-qty').value); if(!(q>0)){toast('Escribe la cantidad que ingresa.','bad');return}

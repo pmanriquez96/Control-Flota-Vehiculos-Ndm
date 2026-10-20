@@ -33,6 +33,7 @@ App interna de **Neumáticos del Maule (NDM)** / Repuestos del Maule para contro
 ## Pendientes / ideas
 
 - Configurar el envío de correo (ver README). Railway bloquea SMTP en algunos planes («Connection timeout»): se agregó Brevo por HTTPS (`BREVO_API_KEY` + `MAIL_FROM`, `sendBrevo` en `lib/alerts.js`); si existe, se usa en vez de SMTP. Sin ninguno de los dos solo se ven alertas en pantalla.
+- El cuadro «Filtros y aceite» de la ficha del vehículo es solo informativo (se quitó «Editar stock»). Por ahora el stock solo sube con «Ingresar compra de repuestos» (pestaña Stock Filtros y Repuestos) y baja al anotar trabajos; ya no hay forma de fijar o corregir una cantidad ni de cambiar `aceiteUso` (bidones por cambio) y `aceiteUnidad` desde la pantalla. Si hace falta, agregar «Editar stock» en la pestaña Stock (código previo en el historial de git: casos `stock-edit` y `stock-save`).
 - La interfaz del editor aún muestra todo lo que ve el admin (solo `/admin.html` es exclusivo del admin).
 - Probar el checklist con fotos en el celular real de un chofer (cámara trasera directa), incluida la instalación en la pantalla de inicio y el envío sin señal (apagar los datos, guardar, volver a prenderlos).
 - El modo sin señal solo cubre guardar el checklist; el resto de la plataforma necesita conexión. El celular debe haber abierto la página al menos una vez con señal.
