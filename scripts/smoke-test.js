@@ -35,7 +35,7 @@ async function call(cookie, method, url, body) {
   ok((await call(C, 'PUT', '/api/doc/settings/personal', { data: { names: ['x'] } })).s === 403, 'chofer NO edita la lista de nombres directo');
   // y solo lee lo mínimo
   const cv = await call(C, 'GET', '/api/col/vehicles');
-  ok(cv.s === 200 && cv.j.length === v.j.length && cv.j.every((r) => Object.keys(r.data).every((k) => ['nombre', 'patente', 'order'].includes(k))), 'chofer ve vehículos solo con nombre y patente');
+  ok(cv.s === 200 && cv.j.length === v.j.length && cv.j.every((r) => Object.keys(r.data).every((k) => ['nombre', 'patente', 'order', 'alertas'].includes(k)) && Array.isArray(r.data.alertas) && r.data.alertas.every((a) => Object.keys(a).sort().join() === 'kind,s,txt')), 'chofer ve vehículos solo con nombre, patente y un aviso de alertas (sin papeles ni historial)');
   const ck = await call(C, 'GET', '/api/col/kmlog');
   ok(ck.s === 200 && ck.j.every((r) => r.data.entries.length <= 1), 'chofer ve solo el último kilometraje');
   ok((await call(C, 'GET', '/api/col/checklists')).j.length === 0, 'chofer NO ve checklists guardados');
