@@ -713,7 +713,6 @@ function cardPap(v){
     h+='<div class="form">'+fld('pp-nombre','Vehículo',v.nombre)+fld('pp-pat','Patente',v.patente)+
       myField('pp-rt',v.rt,'Revisión técnica vence')+fld('pp-rtd','Día (opcional)',v.rtDia||'','number','min="1" max="31" inputmode="numeric"')+
       myField('pp-per',v.permiso,'Permiso de circulación vence')+myField('pp-ext',v.extintor,'Renovación extintor')+
-      fld('pp-extn','Nota del extintor',v.extintorNota||'')+fld('pp-nk','Próxima mantención (km)',v.nextKm==null?'':v.nextKm,'number','min="0" inputmode="numeric"')+
       
       fld('pp-muni','Municipalidad',v.muni||'')+fld('pp-rut','RUT contribuyente',v.rut||'')+
       fld('pp-pago','Pago del permiso (link o nota)',v.pago||'')+
@@ -724,8 +723,7 @@ function cardPap(v){
     var pago=v.pago||''; var pagoH=/^https?:\/\//.test(pago)?'<a href="'+esc(pago)+'" target="_blank" rel="noopener">Abrir portal de pago</a>':esc(pago||'—');
     h+='<dl class="dl"><dt>Revisión técnica</dt><dd>'+esc(rt.lab||'—')+' '+pill(rt)+(rt.s!=='none'?'<span class="hint">aviso desde el '+rt.start.getDate()+' '+MES3[rt.start.getMonth()]+'</span>':'')+'</dd>'+
       '<dt>Permiso de circulación</dt><dd>'+esc(pe.lab||'—')+' '+pill(pe)+(pe.s!=='none'?'<span class="hint">aviso desde el '+pe.start.getDate()+' '+MES3[pe.start.getMonth()]+'</span>':'')+'</dd>'+
-      '<dt>Extintor</dt><dd>'+esc(ex.lab||'—')+' '+(ex.s!=='none'?pill(ex):'')+(v.extintorNota?'<span class="hint">'+esc(v.extintorNota)+'</span>':'')+'</dd>'+
-      '<dt>Próxima mantención</dt><dd>'+fmt(v.nextKm)+' km</dd>'+
+      '<dt>Extintor</dt><dd>'+esc(ex.lab||'—')+' '+(ex.s!=='none'?pill(ex):'')+'</dd>'+
       
       '<dt>Municipalidad</dt><dd>'+esc(v.muni||'—')+'</dd><dt>RUT contribuyente</dt><dd>'+esc(v.rut||'—')+'</dd><dt>Pago del permiso</dt><dd>'+pagoH+'</dd>'+
       (v.notas?'<dt>Notas</dt><dd>'+esc(v.notas)+'</dd>':'')+'</dl>';
@@ -774,7 +772,7 @@ function renderFlota(){
     h+='<tr><td><button class="rowbtn" data-act="open" data-id="'+v.id+'"><b>'+esc(shortName(v))+'</b><span class="plate">'+esc(v.patente)+'</span></button></td>'+
       '<td>'+(c?fmt(c.km):'—')+'</td><td>'+fmt(v.nextKm)+'<span class="sub2">'+pill(ms)+'</span></td>'+
       '<td>'+esc(rt.lab||'—')+'<span class="sub2">'+pill(rt)+'</span></td><td>'+esc(pe.lab||'—')+'<span class="sub2">'+pill(pe)+'</span></td>'+
-      '<td>'+(ex.lab?esc(ex.lab):'—')+(v.extintorNota?'<span class="sub2">'+esc(v.extintorNota)+'</span>':'')+'</td><td>'+((v.pending||[]).length)+'</td></tr>';
+      '<td>'+(ex.lab?esc(ex.lab):'—')+'</td><td>'+((v.pending||[]).length)+'</td></tr>';
   });
   $('#p-flota').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">Toca un vehículo para ver y editar toda su ficha.</p>';
 }
@@ -1275,7 +1273,7 @@ document.addEventListener('click',function(e){
     case 'pap-edit': ui.edit={k:'pap'}; render(true); break;
     case 'pap-save':
       var nm=$('#pp-nombre').value.trim(), pt=$('#pp-pat').value.trim().toUpperCase(); if(!nm||!pt){toast('Nombre y patente son obligatorios.','bad');return}
-      var vals={nombre:nm,patente:pt,rt:readMY('pp-rt'),rtDia:num($('#pp-rtd').value),permiso:readMY('pp-per'),extintor:readMY('pp-ext'),extintorNota:$('#pp-extn').value.trim(),nextKm:num($('#pp-nk').value),
+      var vals={nombre:nm,patente:pt,rt:readMY('pp-rt'),rtDia:num($('#pp-rtd').value),permiso:readMY('pp-per'),extintor:readMY('pp-ext'),
         muni:$('#pp-muni').value.trim(),rut:$('#pp-rut').value.trim(),pago:$('#pp-pago').value.trim(),notas:$('#pp-notas').value.trim()};
       ui.edit=null; mutVeh(vid,Object.keys(vals),function(d){Object.assign(d,vals)}); toast('Papeles guardados'); break;
     case 'pauta-edit': ui.edit={k:'pauta'}; render(true); break;
