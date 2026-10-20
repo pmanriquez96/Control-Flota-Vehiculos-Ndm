@@ -147,6 +147,12 @@ td .sub2{display:block;font-size:12.5px;color:var(--muted)}
 .msg{white-space:pre-wrap;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px;overflow-wrap:anywhere}
 .checkline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .checkline input[type=checkbox]{width:20px;height:20px}
+/* casilla + texto largo: la casilla queda al lado del texto aunque este ocupe varias líneas */
+.checkline.nw{flex-wrap:nowrap;align-items:flex-start}
+.checkline.nw>input[type=checkbox]{flex:none;margin:1px 0 0}
+.checkline.nw>label,.checkline.nw>span{flex:1;min-width:0}
+.checkline .cl{display:flex;gap:8px;align-items:center}
+.checkline .cl>input[type=checkbox]{margin:1px 0 0}
 .checkline input[type=number]{width:110px;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface)}
 details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .solo .tabs,.solo #alertStrip,.solo .kmbar,.solo .gowrap,.solo #recent{display:none}
@@ -663,17 +669,10 @@ function cardHist(v){
 }
 
 function cardStock(v){
-  var st=v.stock||{}, info=stockInfo(v), L=info.latest, editing=ui.edit&&ui.edit.k==='stock';
+  var st=v.stock||{}, info=stockInfo(v), L=info.latest;
   var pol=(v.pauta||[]).filter(function(r){return r.k==='Cambio filtro de polen'})[0];
   var polNA=pol&&(pol.v==='No aplica'||pol.v==='—')&&st.polen==null&&!info.last.polen;
-  var h='<section class="card a-stock"><header><h3>Filtros y aceite</h3>'+(editing?'':'<button class="btn sm" data-act="stock-edit">Editar stock</button>')+'</header>';
-  if(editing){
-    h+='<div class="form">'+ITEMS.map(function(it){var k=it[0];return fld('sk-'+k,it[1]+(k==='aceite'?' (bidones)':' (unidades)'),st[k]==null?'':st[k],'number','min="0" step="'+(k==='aceite'?'0.1':'1')+'" inputmode="decimal"')}).join('')+
-      fld('sk-uso','Bidones de aceite que se descuentan por cambio',v.aceiteUso||1,'number','min="0" step="0.1"')+fld('sk-unid','Unidad del aceite',v.aceiteUnidad||'bidones')+
-      '<p class="hint full">Deje vacío el repuesto que no quiera controlar. El stock baja solo cuando anota el trabajo en el historial.</p>'+
-      '<div class="acts full"><button class="btn pri" data-act="stock-save">Guardar stock</button><button class="btn" data-act="cancel">Cancelar</button></div></div>';
-    return h+'</section>';
-  }
+  var h='<section class="card a-stock"><header><h3>Filtros y aceite</h3></header>';
   h+='<p class="hint" style="margin-bottom:8px">'+(L?'Última mantención con repuestos: <b>'+esc(mlab(L.month,true))+'</b>'+(L.km!=null?' · '+fmt(L.km)+' km':''):'Aún no hay repuestos anotados en el historial.')+'</p>';
   h+='<ul class="stk"><li class="hd"><span>Repuesto</span><span>Stock</span><span class="hd2">¿Cambió?</span></li>';
   ITEMS.forEach(function(it){
@@ -704,7 +703,7 @@ function renderStockTab(){
       ITEMS.map(function(it){var k=it[0];return '<td>'+(st[k]==null?'<span class="hint">—</span>':st[k]<=0?'<span class="pill bad">Sin stock</span>':'<b>'+fmt(st[k])+'</b>'+(k==='aceite'?' <span class="hint">'+esc(v.aceiteUnidad||'bidones')+'</span>':''))+'</td>'}).join('')+
       '<td>'+(L?esc(mlab(L.month))+'<span class="sub2">'+ITEMS.filter(function(it){return L.set[it[0]]}).map(function(it){return '✓ '+it[1].replace('Filtro de ','F. ').replace('Aceite de motor','Aceite')}).join(' · ')+'</span>':'—')+'</td></tr>';
   });
-  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para cargar o editar su stock.</p>'+repHtml();
+  $('#p-stock').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">“—” significa que ese repuesto no tiene stock registrado. Toque un vehículo para ver su ficha. Para sumar repuestos que llegaron, use «Ingresar compra de repuestos», arriba.</p>'+repHtml();
 }
 
 function cardPap(v){
@@ -846,9 +845,9 @@ function renderAlertTab(){
     '<div class="field"><span>Correos que reciben las alertas ('+(c.emails||[]).length+')</span>'+
       ((c.emails||[]).length?'<ul class="list" style="margin:6px 0">'+c.emails.map(function(m,i){return '<li><span class="grow">'+esc(m)+'</span><div class="acts"><button class="btn sm" data-act="mail-del" data-i="'+i+'">Quitar</button></div></li>'}).join('')+'</ul>':'<p class="empty" style="margin:6px 0">Todavía no hay correos. Agrega el primero.</p>')+
       '<div class="form" style="margin-top:6px"><label class="field"><span class="sr">Agregar correo</span><input id="cf-email-new" type="text" inputmode="email" autocomplete="off" placeholder="nombre@empresa.cl (puedes pegar varios separados por coma)"></label><button class="btn" data-act="mail-add">Agregar correo</button></div></div>'+
-    '<div class="checkline"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></div>'+
-    '<div class="checkline"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior; urgente y con correo diario desde 7 días antes de que termine el mes</label></div>'+
-    '<div class="checkline"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
+    '<div class="checkline"><span class="cl"><input id="cf-mant" type="checkbox"'+(c.mantOn?' checked':'')+'><label for="cf-mant">Mantención: avisar cuando falten</label></span><span class="cl"><input id="cf-km" type="number" min="100" step="100" value="'+esc(c.mantKm)+'" aria-label="Kilómetros de anticipación"><span>km o menos</span></span></div>'+
+    '<div class="checkline nw"><input id="cf-rt" type="checkbox"'+(c.rtOn?' checked':'')+'><label for="cf-rt">Revisión técnica: aviso la última semana del mes anterior; urgente y con correo diario desde 7 días antes de que termine el mes</label></div>'+
+    '<div class="checkline nw"><input id="cf-per" type="checkbox"'+(c.permOn?' checked':'')+'><label for="cf-per">Permiso de circulación: aviso la última semana del mes anterior</label></div>'+
     '<div class="acts"><button class="btn pri" data-act="cfg-save">Guardar configuración</button></div></div></section>'+
     '<section class="card"><header><h3>Alertas activas ('+al.length+')</h3></header>'+
     (al.length?'<ul class="list">'+al.map(function(a){return '<li><span class="pill '+a.s+'">'+(a.s==='bad'?'Urgente':'Atención')+'</span><span class="grow"><b>'+esc(a.kind)+'</b> · '+esc(a.v.nombre)+' <span class="plate">'+esc(a.v.patente)+'</span><br>'+esc(a.txt)+'</span><button class="btn sm" data-act="open" data-id="'+a.v.id+'">Ver ficha</button></li>'}).join('')+'</ul>':'<p class="empty">No hay alertas activas.</p>')+'</section></div>';
@@ -894,7 +893,7 @@ function buildChkForm(){
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
    '<label class="field"><span>Kilometraje actual</span><input id="ck-km" type="number" inputmode="numeric" min="0" required></label>'+
    personField('ck-chofer','Nombre del chofer',false)+personField('ck-peon','Nombre del peoneta',true)+
-   '<label class="checkline full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
+   '<label class="checkline nw full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
    '<div class="acts" style="margin-bottom:12px"><button type="button" class="btn sm" data-act="chk-allbueno">Marcar todo Bueno</button><button type="button" class="btn sm" data-act="chk-clear">Limpiar</button><span class="hint" id="ck-count" style="align-self:center"></span></div>'+
    '<div style="display:flex;flex-direction:column;gap:12px">';
   CHK.forEach(function(s,si){
@@ -911,7 +910,7 @@ function buildChkForm(){
     h+='</div>';
   });
   h+='</div><label class="field" style="margin-top:14px"><span>Observaciones generales</span><textarea id="ck-obs"></textarea></label><div style="margin-top:6px">'+camBtn('obs','Tomar foto')+'<div class="thumbs" id="th-obs"></div></div>'+
-   '<div class="checkline" style="margin-top:12px"><input id="ck-topend" type="checkbox" checked><label for="ck-topend">Agregar los puntos en mal estado (Malo) a los trabajos pendientes del vehículo</label></div>'+
+   '<div class="checkline nw" style="margin-top:12px"><input id="ck-topend" type="checkbox" checked><label for="ck-topend">Agregar los puntos en mal estado (Malo) a los trabajos pendientes del vehículo</label></div>'+
    '<div class="acts" style="margin-top:14px"><button class="btn pri" type="submit">Guardar checklist</button></div></form></section><div id="chkList" style="margin-top:16px"></div>';
   $('#p-chk').innerHTML=h; chkBuilt=true;
   $('#ck-fecha').value=todayStr();
@@ -1266,11 +1265,6 @@ document.addEventListener('click',function(e){
       if(dsc2) toast('Trabajo actualizado'+stockMsg(v,us2,dsc2)); break;
     case 'hist-del': ui.confirm=null; mutVeh(vid,['history','stock'],function(d){var e=d.history.filter(function(h){return h.id===id})[0]; restoreStock(d,e); d.history=d.history.filter(function(h){return h.id!==id})}); break;
     /* stock */
-    case 'stock-edit': ui.edit={k:'stock'}; render(true); break;
-    case 'stock-save':
-      var sv2={}; ITEMS.forEach(function(it){var x=$('#sk-'+it[0]).value; sv2[it[0]]=(x===''?null:Math.max(0,parseFloat(x)))});
-      var uso2=Math.max(0,parseFloat($('#sk-uso').value))||1, un2=($('#sk-unid').value||'').trim()||'bidones';
-      ui.edit=null; mutVeh(vid,['stock','aceiteUso','aceiteUnidad'],function(d){d.stock=Object.assign(d.stock||{},sv2); d.aceiteUso=uso2; d.aceiteUnidad=un2}); toast('Stock guardado'); break;
     case 'stk-buy': ui.stkBuy=!ui.stkBuy; render(true); if(ui.stkBuy&&$('#stk-qty'))$('#stk-qty').focus(); break;
     case 'stk-add':
       var sv=$('#stk-veh').value, sk=$('#stk-item').value, q=parseFloat($('#stk-qty').value); if(!(q>0)){toast('Escribe la cantidad que ingresa.','bad');return}
