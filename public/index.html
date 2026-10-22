@@ -887,7 +887,7 @@ function getPerson(id){
   return v;
 }
 function buildChkForm(){
-  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></header><a class="btn pri manual-btn" id="chkManual" href="/manual-checklist.pdf" target="_blank" rel="noopener" hidden>VER MANUAL DE USO</a><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
+  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></header><a class="btn pri manual-btn" id="chkManual" href="/manual-checklist.pdf" target="_blank" rel="noopener">VER MANUAL DE USO</a><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
    '<div class="form" style="margin-bottom:14px">'+
    '<label class="field"><span>Vehículo</span><select id="ck-veh"></select></label>'+
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
@@ -952,7 +952,7 @@ function renderChkAlert(){
 function applyChkForm(){
   var f=$('#chkForm'), b=$('#chkToggle'); if(!f||!b) return;
   var chofer=ui.role==='chofer', open=chofer||!!ui.chkFormOpen;
-  f.hidden=!open; b.hidden=chofer; var mb=$('#chkManual'); if(mb) mb.hidden=!chofer; b.textContent=open?'Ocultar formulario':'Abrir formulario'; b.setAttribute('aria-expanded',open?'true':'false');
+  f.hidden=!open; b.hidden=chofer; b.textContent=open?'Ocultar formulario':'Abrir formulario'; b.setAttribute('aria-expanded',open?'true':'false');
 }
 function renderChkList(){
   if(!chkBuilt) buildChkForm();
