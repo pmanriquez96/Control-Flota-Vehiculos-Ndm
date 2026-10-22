@@ -15,9 +15,11 @@ App interna de **Neumáticos del Maule (NDM)** / Repuestos del Maule para contro
 
 ## Modelo de datos
 
+- `settings/rutas` = `{names:[...]}`: rutas que elige el chofer en el checklist (campo «Ruta realizada», entre kilometraje y chofer). La lista la administran admin/editor en la pestaña Checklist (tarjeta «Rutas»); el chofer solo la lee. Es **obligatoria al guardar si hay rutas en la lista** (si la lista está vacía el campo no aparece); la exige la pantalla, el servidor solo la guarda (así no se pierden checklists sin señal hechos antes).
+
 - `vehicles/{id}`: nombre, patente, order, rt (AAAA-MM), rtDia, permiso (AAAA-MM), extintor, nextKm, muni, rut, pago, notas, `pending` [{id,text}], `history` [{id,month,km,text,usos,managed,desc}], `pauta` [{k,v}], `accesorios` {}, `stock` {aire,comb,faceite,polen,aceite}, `aceiteUnidad`, `aceiteUso`.
 - `kmlog/{vehId}`: `{entries:[{id,d,km,nota}]}`.
-- `checklists/{id}`: vid, fecha, km, chofer, peoneta, items, notas, obs, fotos {clave:[idFoto]}. (`resp`, el responsable de la inspección, se eliminó; los checklists antiguos pueden traerlo y no se muestra.)
+- `checklists/{id}`: vid, fecha, km, chofer, peoneta, ruta, items, notas, obs, fotos {clave:[idFoto]}. (`resp`, el responsable de la inspección, se eliminó; los checklists antiguos pueden traerlo y no se muestra.)
 - `fotos/{id}`: `{cid,vid,key,d}` con `d` = imagen JPEG en base64 reducida (~100 KB). Se carga solo al abrir el detalle de un checklist. El detalle muestra una galería con **todas** las fotos del checklist, cada una con el nombre del punto (`fotosGaleria`), sin importar la sección.
 - Un documento no puede pasar de 256 KB. No hay arreglos dentro de arreglos.
 

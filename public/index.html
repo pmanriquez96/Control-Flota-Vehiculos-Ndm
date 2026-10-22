@@ -168,6 +168,7 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .gal .thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
 #chkAlert{margin-bottom:12px}
 a.manual-btn{display:inline-flex;align-items:center;text-decoration:none;background:#475569;border-color:#475569;color:#fff;font-weight:700;letter-spacing:.02em}
+#ck-ruta-f[hidden]{display:none}
 .chk-btns{display:flex;gap:8px;flex-wrap:wrap}
 a.manual-btn:hover{background:#334155;border-color:#334155}
 #chkAlert .box{border-radius:var(--r);padding:9px 12px;border:1px solid var(--line);font-size:14px}
@@ -295,7 +296,7 @@ var CHKMULTI={ctab:[['check','Check Engine'],['abs','Abs'],['airbag','Airbag'],[
 var CHKNAME={};CHK.forEach(function(s){s.i.forEach(function(x){CHKNAME[x[0]]=x[1]})});
 
 var db=null, unsub=[];
-var S={people:[],veh:{},km:{},chk:{},rep:{items:[]},cfg:{emails:[],mantOn:true,mantKm:1000,rtOn:true,permOn:true}};
+var S={people:[],rutas:[],veh:{},km:{},chk:{},rep:{items:[]},cfg:{emails:[],mantOn:true,mantKm:1000,rtOn:true,permOn:true}};
 var ui={role:null,recentAll:false,repAdd:false,repEdit:null,sel:null,tab:'veh',edit:null,addHist:false,addPend:false,confirm:null,filter:'',lastKmWarn:null,chkOpen:null,loaded:{veh:false},canWrite:true};
 var $=function(s,r){return (r||document).querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -799,7 +800,7 @@ function renderRecent(){
   h+='<ul class="list'+(ui.recentAll?' rcl':'')+'">'+shown.map(function(x){
     var v=S.veh[x.vid], st=chkStats(x);
     var pills=(st.fails.length?pill({s:'bad'},st.fails.length+(st.fails.length===1?' malo':' malos')):'')+(st.regs.length?pill({s:'warn'},st.regs.length+(st.regs.length===1?' regular':' regulares')):'')+(!st.fails.length&&!st.regs.length&&st.answered>0?pill({s:'ok'},'Todo bueno'):'')+(st.nfot?pill({s:'none'},st.nfot+(st.nfot===1?' foto':' fotos')):'');
-    return '<li><span class="rc"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+' <span class="hint">· '+esc(x.chofer)+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
+    return '<li><span class="rc"><b>'+esc((x.fecha||'').split('-').reverse().join('-'))+'</b> · '+(v?esc(shortName(v))+' <span class="plate">'+esc(v.patente)+'</span>':'Vehículo eliminado')+' <span class="hint">· '+esc(x.chofer)+(x.ruta?' · '+esc(x.ruta):'')+'</span></span>'+pills+(v?'<button class="btn sm" data-act="chk-go" data-id="'+esc(x.id)+'" data-vid="'+esc(x.vid)+'">Ver</button>':'')+'</li>';
   }).join('')+'</ul>';
   if(L.length>5) h+='<p style="margin-top:6px"><button class="link" data-act="recent-more">'+(ui.recentAll?'Ver menos':'Ver más ('+Math.min(L.length,20)+')')+'</button>'+(ui.recentAll&&L.length>20?' <span class="hint">· últimos 20; el resto está en el checklist de cada vehículo</span>':'')+'</p>';
   el.innerHTML=h;
@@ -875,6 +876,12 @@ function fillPeople(){
     $('#'+x[0]+'-otro').hidden=(s.value!=='__otro');
   });
 }
+function fillRutas(){
+  var s=$('#ck-ruta'); if(!s) return; var cur=s.value;
+  s.innerHTML='<option value="">Elegir…</option>'+S.rutas.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('');
+  s.value=cur; if(s.value!==cur) s.value='';
+  $('#ck-ruta-f').hidden=!S.rutas.length;
+}
 function fillVehSel(){
   var sel=$('#ck-veh'); if(!sel) return;
   var vs=vlist(), sig=vs.map(function(v){return v.id+v.nombre+v.patente}).join('|');
@@ -893,6 +900,7 @@ function buildChkForm(){
    '<label class="field"><span>Vehículo</span><select id="ck-veh"></select></label>'+
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
    '<label class="field"><span>Kilometraje actual</span><input id="ck-km" type="number" inputmode="numeric" min="0" required></label>'+
+   '<label class="field" id="ck-ruta-f" hidden><span>Ruta realizada</span><select id="ck-ruta" aria-label="Ruta realizada"></select></label>'+
    personField('ck-chofer','Nombre del chofer',false)+personField('ck-peon','Nombre del peoneta',true)+
    '<label class="checkline nw full"><input id="ck-savenames" type="checkbox" checked><span>Guardar en la lista los nombres nuevos que escriba</span></label></div>'+
    '<div class="acts" style="margin-bottom:12px"><button type="button" class="btn sm" data-act="chk-allbueno">Marcar todo Bueno</button><button type="button" class="btn sm" data-act="chk-clear">Limpiar</button><span class="hint" id="ck-count" style="align-self:center"></span></div>'+
@@ -915,7 +923,7 @@ function buildChkForm(){
    '<div class="acts" style="margin-top:14px"><button class="btn pri" type="submit">Guardar checklist</button></div></form></section><div id="chkList" style="margin-top:16px"></div>';
   $('#p-chk').innerHTML=h; chkBuilt=true;
   $('#ck-fecha').value=todayStr();
-  fillPeople(); updChkCount();
+  fillPeople(); fillRutas(); updChkCount();
 }
 function updChkCount(){
   var tot=chkKeys().length, done=0;
@@ -959,14 +967,17 @@ function renderChkList(){
   if(!chkBuilt) buildChkForm();
   applyChkForm();
   var v=S.veh[ui.sel]; if(!v) return;
-  fillVehSel(); fillPeople(); renderChkAlert();
+  fillVehSel(); fillPeople(); fillRutas(); renderChkAlert();
   if(!$('#ck-km').value){var c=curKm(ui.sel); if(c) $('#ck-km').placeholder='Último: '+fmt(c.km)}
   if(ui.role==='chofer'){$('#chkList').innerHTML='';return}
   var L=Object.keys(S.chk).map(function(k){return Object.assign({id:k},S.chk[k])}).filter(function(x){return x.vid===ui.sel}).sort(function(a,b){return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:(b.at||0)-(a.at||0)});
   var ph='<section class="card" style="margin-bottom:16px"><header><h3>Nombres del personal ('+S.people.length+')</h3><span class="hint">Aparecen en los menús de chofer y peoneta</span></header>'+
     (S.people.length?'<ul class="list">'+S.people.map(function(n,i){var cf=ui.confirm==='ppl'+i;return '<li><span class="grow">'+esc(n)+'</span><div class="acts">'+(cf?'<button class="btn sm bad" data-act="ppl-del" data-i="'+i+'">Sí, quitar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="ppl'+i+'">Quitar</button>')+'</div></li>'}).join('')+'</ul>':'<p class="empty">Aún no hay nombres. Agregue el primero.</p>')+
     '<div class="form" style="margin-top:10px"><label class="field"><span>Agregar nombre</span><input id="ppl-new" type="text" placeholder="Ej: Jacob"></label><button class="btn pri" data-act="ppl-add">Agregar a la lista</button></div></section>';
-  var h=ph+'<section class="card"><header><h3>Checklists guardados de '+esc(shortName(v))+' ('+L.length+')</h3></header>';
+  var rh='<section class="card" style="margin-bottom:16px"><header><h3>Rutas ('+S.rutas.length+')</h3><span class="hint">El chofer elige una al hacer el checklist</span></header>'+
+    (S.rutas.length?'<ul class="list">'+S.rutas.map(function(n,i){var cf=ui.confirm==='rta'+i;return '<li><span class="grow">'+esc(n)+'</span><div class="acts">'+(cf?'<button class="btn sm bad" data-act="rta-del" data-i="'+i+'">Sí, quitar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="rta'+i+'">Quitar</button>')+'</div></li>'}).join('')+'</ul>':'<p class="empty">Aún no hay rutas. Mientras no agregue ninguna, el checklist no la pide.</p>')+
+    '<div class="form" style="margin-top:10px"><label class="field"><span>Agregar ruta</span><input id="rta-new" type="text" maxlength="80" placeholder="Ej: Talca – Linares"></label><button class="btn pri" data-act="rta-add">Agregar a la lista</button></div></section>';
+  var h=ph+rh+'<section class="card"><header><h3>Checklists guardados de '+esc(shortName(v))+' ('+L.length+')</h3></header>';
   if(!L.length) h+='<p class="empty">Todavía no hay inspecciones para este vehículo.</p>';
   else h+='<ul class="list">'+L.map(function(x){
     var st0=chkStats(x), fails=st0.fails, regs=st0.regs, answered=st0.answered, sinrev=st0.sinrev, nfot=st0.nfot;
@@ -975,7 +986,7 @@ function renderChkList(){
     if(open){
       det='<div style="flex-basis:100%">'+fotosGaleria(x)+CHK.map(function(s){return '<p class="fl" style="margin-top:8px">'+esc(s.t)+'</p><ul class="list">'+s.i.map(function(it){if(it[0]==='ctab')return testigosLi(x,it);var r=(x.items||{})[it[0]];var st=(r==='bueno'||r==='ok')?'ok':r==='regular'?'warn':(r==='malo'||r==='falla')?'bad':'none';return '<li style="padding:4px 0"><span class="grow" style="min-width:140px">'+esc(it[1])+((x.notas||{})[it[0]]?' <span class="hint">· '+esc(x.notas[it[0]])+'</span>':'')+'</span>'+pill({s:st},(r==='bueno'||r==='ok')?'Bueno':r==='regular'?'Regular':(r==='malo'||r==='falla')?'Malo':r==='na'?'No aplica':'Sin revisar')+'</li>'}).join('')+'</ul>'}).join('')+(x.obs?'<p style="margin-top:8px"><b>Observaciones:</b> '+esc(x.obs)+'</p>':'')+'</div>';
     }
-    return '<li id="chk-'+esc(x.id)+'"><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+'</span></span>'+
+    return '<li id="chk-'+esc(x.id)+'"><span class="grow"><b>'+x.fecha.split('-').reverse().join('-')+'</b> · '+fmt(x.km)+' km<br><span class="hint">Chofer: '+esc(x.chofer)+(x.peoneta?' · Peoneta: '+esc(x.peoneta):'')+(x.ruta?' · Ruta: '+esc(x.ruta):'')+'</span></span>'+
       (fails.length?pill({s:'bad'},fails.length+(fails.length===1?' malo':' malos')):'')+(regs.length?pill({s:'warn'},regs.length+(regs.length===1?' regular':' regulares')):'')+(!fails.length&&!regs.length&&answered>0?pill({s:'ok'},'Todo bueno'):'')+(sinrev>0?pill({s:'none'},sinrev+' sin revisar'):'')+(nfot?pill({s:'none'},nfot+(nfot===1?' foto':' fotos')):'')+
       '<div class="acts"><button class="btn sm" data-act="chk-open" data-id="'+x.id+'">'+(open?'Ocultar':'Ver detalle')+'</button>'+(cf?'<button class="btn sm bad" data-act="chk-del" data-id="'+x.id+'">Sí, borrar</button><button class="btn sm" data-act="cancel">No</button>':'<button class="btn sm" data-act="ask" data-key="chk'+x.id+'">Borrar</button>')+'</div>'+det+'</li>';
   }).join('')+'</ul>';
@@ -1123,8 +1134,9 @@ document.addEventListener('submit',function(e){
   if(e.target.id!=='chkForm') return;
   e.preventDefault();
   var id=ui.sel, v=S.veh[id]; if(!v) return;
-  var km=parseInt($('#ck-km').value,10), chofer=getPerson('ck-chofer'), peoneta=getPerson('ck-peon'), fecha=$('#ck-fecha').value;
+  var km=parseInt($('#ck-km').value,10), chofer=getPerson('ck-chofer'), peoneta=getPerson('ck-peon'), fecha=$('#ck-fecha').value, ruta=S.rutas.length?$('#ck-ruta').value:'';
   if(!(km>=0)||!chofer||!fecha){toast('Completa el kilometraje y el nombre del chofer.','bad');return}
+  if(S.rutas.length&&!ruta){toast('Elige la ruta realizada.','bad');$('#ck-ruta').focus();return}
   var items={}, notas={}, fails=[];
   chkKeys().forEach(function(k){
     var r=document.querySelector('input[name="r-'+k+'"]:checked'); items[k]=r?r.value:null;
@@ -1140,13 +1152,14 @@ document.addEventListener('submit',function(e){
   }
   ui.chkKmOk=null;
   var fotos={}; Object.keys(ui.photos).forEach(function(k){var L=ui.photos[k]; if(L&&L.length) fotos[k]=L.map(function(f){return f.d})});
-  var payload={clientId:uid('q'),vid:id,fecha:fecha,km:km,chofer:chofer,peoneta:peoneta,items:items,notas:notas,obs:$('#ck-obs').value.trim(),fotos:fotos,pendientes:$('#ck-topend').checked?fails:[],guardarNombres:$('#ck-savenames').checked};
+  var payload={clientId:uid('q'),vid:id,fecha:fecha,km:km,chofer:chofer,peoneta:peoneta,ruta:ruta,items:items,notas:notas,obs:$('#ck-obs').value.trim(),fotos:fotos,pendientes:$('#ck-topend').checked?fails:[],guardarNombres:$('#ck-savenames').checked};
   var btn=e.target.querySelector('button[type="submit"]'), errT='No se pudo guardar el checklist. Revisa tu conexión e intenta de nuevo.';
   function libre(){btn.disabled=false; btn.textContent='Guardar checklist'}
   function limpiar(){
     chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});var n=$('#n-'+k);n.value='';n.hidden=true});
     clearTestigos(); clearPhotos();
     ['ck-chofer','ck-peon'].forEach(function(p){$('#'+p+'-sel').value='';$('#'+p+'-otro').value='';$('#'+p+'-otro').hidden=true});
+    if($('#ck-ruta')) $('#ck-ruta').value='';
     $('#ck-obs').value=''; $('#ck-km').value=''; updChkCount();
     window.scrollTo({top:0,behavior:'smooth'}); render(true);
   }
@@ -1291,6 +1304,8 @@ document.addEventListener('click',function(e){
     case 'chk-allbueno': chkKeys().forEach(function(k){var r=document.querySelector('input[name="r-'+k+'"][value="bueno"]');if(r&&!document.querySelector('input[name="r-'+k+'"]:checked'))r.checked=true}); updChkCount(); break;
     case 'chk-clear': clearPhotos(); chkKeys().forEach(function(k){document.querySelectorAll('input[name="r-'+k+'"]').forEach(function(r){r.checked=false});$('#n-'+k).hidden=true}); clearTestigos(); updChkCount(); break;
     case 'ppl-add': var nn=($('#ppl-new').value||'').trim(); if(!nn)return; if(S.people.indexOf(nn)>=0){toast('Ese nombre ya está en la lista.','bad');return} S.people=S.people.concat([nn]); persist('settings/personal',{names:S.people},true); render(true); break;
+    case 'rta-add': var rn=($('#rta-new').value||'').trim(); if(!rn)return; if(S.rutas.indexOf(rn)>=0){toast('Esa ruta ya está en la lista.','bad');return} S.rutas=S.rutas.concat([rn]); persist('settings/rutas',{names:S.rutas},true); render(true); break;
+    case 'rta-del': var rx=parseInt(b.dataset.i,10); ui.confirm=null; S.rutas=S.rutas.filter(function(_,i){return i!==rx}); persist('settings/rutas',{names:S.rutas},true); render(true); break;
     case 'ppl-del': var ix=parseInt(b.dataset.i,10); ui.confirm=null; S.people=S.people.filter(function(_,i){return i!==ix}); persist('settings/personal',{names:S.people},true); render(true); break;
     case 'chk-open': ui.chkOpen=(ui.chkOpen===id?null:id); render(true); break;
     case 'chk-del': ui.confirm=null; removeChk(id); render(true); break;
@@ -1339,6 +1354,7 @@ function start(){
     if(chofer){document.body.classList.add('solo','chofer'); $('#soloOff').hidden=true; ui.tab='chk'}
     unsub.push(snapColl('vehicles','veh'));
     unsub.push(snapColl('kmlog','km'));
+    unsub.push(db.doc('settings/rutas').onSnapshot(function(s){ S.rutas=(s.exists&&s.data().names)||[]; render(false)},function(){}));
     unsub.push(db.doc('settings/personal').onSnapshot(function(s){ S.people=(s.exists&&s.data().names)||[]; render(false)},function(){}));
     if(chofer){render(true);return} // el chofer solo ve el checklist: no se cargan checklists, alertas ni repuestos
     unsub.push(snapColl('checklists','chk'));

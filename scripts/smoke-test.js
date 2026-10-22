@@ -51,6 +51,10 @@ async function call(cookie, method, url, body) {
   ok(sv.s === 200 && sv.j.id, 'chofer guarda un checklist');
   const saved = (await call(A, 'GET', '/api/doc/checklists/' + sv.j.id)).j.data;
   ok(saved.chofer === 'Chofer Prueba' && saved.resp === undefined && saved.fotos && saved.fotos.ndel.length === 1, 'el checklist quedó guardado con su foto y sin responsable');
+  ok((await call(C, 'PUT', '/api/doc/settings/rutas', { data: { names: ['x'] } })).s === 403, 'chofer NO edita la lista de rutas');
+  ok((await call(A, 'PUT', '/api/doc/settings/rutas', { data: { names: ['Ruta de prueba'] } })).s === 200 && (await call(C, 'GET', '/api/doc/settings/rutas')).j.data.names[0] === 'Ruta de prueba', 'el admin guarda las rutas y el chofer las puede leer');
+  const svr = await call(C, 'POST', '/api/checklist', Object.assign({}, base, { clientId: 'rutaabc12345', ruta: 'Ruta de prueba', fotos: {}, pendientes: [] }));
+  ok(svr.s === 200 && (await call(A, 'GET', '/api/doc/checklists/' + svr.j.id)).j.data.ruta === 'Ruta de prueba', 'el checklist guarda la ruta');
   const km1 = (await call(A, 'GET', '/api/doc/kmlog/' + id)).j.data;
   ok(km1.entries.length === km0.entries.length + 1 && km1.entries[km1.entries.length - 1].km === 999999, 'se registró el kilometraje del checklist');
   const veh1 = (await call(A, 'GET', '/api/doc/vehicles/' + id)).j.data;
@@ -77,6 +81,7 @@ async function call(cookie, method, url, body) {
   ok((await call(A, 'PUT', '/api/doc/settings/repuestos', { data: { items: [{ id: 'r1', nombre: 'Prueba', cant: 2, unid: 'unidades', nota: '' }] } })).s === 200, 'administrador guarda otros repuestos');
   ok((await call(C, 'PUT', '/api/doc/settings/repuestos', { data: { items: [] } })).s === 403, 'chofer NO edita otros repuestos');
   await call(A, 'DELETE', '/api/doc/settings/repuestos');
+  await call(A, 'DELETE', '/api/doc/settings/rutas');
   ok((await call(C, 'GET', '/api/users')).s === 403, 'chofer NO ve usuarios');
   ok((await call(A, 'PUT', '/api/doc/settings/alertState', { data: { sent: {} } })).s === 403, 'nadie escribe alertState');
   ok((await call(A, 'GET', '/api/alerts/status')).s === 200, 'estado de alertas');
