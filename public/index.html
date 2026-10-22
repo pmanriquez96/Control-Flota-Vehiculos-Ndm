@@ -167,6 +167,8 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .gal .thumb,.gal .thumb.wait{width:130px;height:130px}
 .gal .thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
 #chkAlert{margin-bottom:12px}
+.manual-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;margin:0 0 12px;font-size:16px;font-weight:800;letter-spacing:.03em;text-decoration:none}
+.manual-btn[hidden]{display:none}
 #chkAlert .box{border-radius:var(--r);padding:9px 12px;border:1px solid var(--line);font-size:14px}
 #chkAlert .box.ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
 #chkAlert .box.warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
@@ -885,7 +887,7 @@ function getPerson(id){
   return v;
 }
 function buildChkForm(){
-  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></header><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
+  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></header><a class="btn pri manual-btn" id="chkManual" href="/manual-checklist.pdf" target="_blank" rel="noopener" hidden>VER MANUAL DE USO</a><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
    '<div class="form" style="margin-bottom:14px">'+
    '<label class="field"><span>Vehículo</span><select id="ck-veh"></select></label>'+
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
@@ -950,7 +952,7 @@ function renderChkAlert(){
 function applyChkForm(){
   var f=$('#chkForm'), b=$('#chkToggle'); if(!f||!b) return;
   var chofer=ui.role==='chofer', open=chofer||!!ui.chkFormOpen;
-  f.hidden=!open; b.hidden=chofer; b.textContent=open?'Ocultar formulario':'Abrir formulario'; b.setAttribute('aria-expanded',open?'true':'false');
+  f.hidden=!open; b.hidden=chofer; var mb=$('#chkManual'); if(mb) mb.hidden=!chofer; b.textContent=open?'Ocultar formulario':'Abrir formulario'; b.setAttribute('aria-expanded',open?'true':'false');
 }
 function renderChkList(){
   if(!chkBuilt) buildChkForm();
