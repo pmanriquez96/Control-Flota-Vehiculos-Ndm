@@ -167,6 +167,9 @@ details>summary{cursor:pointer;font-weight:600;min-height:32px}
 .gal .thumb,.gal .thumb.wait{width:130px;height:130px}
 .gal .thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
 #chkAlert{margin-bottom:12px}
+a.manual-btn{display:inline-flex;align-items:center;text-decoration:none;background:#475569;border-color:#475569;color:#fff;font-weight:700;letter-spacing:.02em}
+.chk-btns{display:flex;gap:8px;flex-wrap:wrap}
+a.manual-btn:hover{background:#334155;border-color:#334155}
 #chkAlert .box{border-radius:var(--r);padding:9px 12px;border:1px solid var(--line);font-size:14px}
 #chkAlert .box.ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
 #chkAlert .box.warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
@@ -713,7 +716,6 @@ function cardPap(v){
     h+='<div class="form">'+fld('pp-nombre','Vehículo',v.nombre)+fld('pp-pat','Patente',v.patente)+
       myField('pp-rt',v.rt,'Revisión técnica vence')+fld('pp-rtd','Día (opcional)',v.rtDia||'','number','min="1" max="31" inputmode="numeric"')+
       myField('pp-per',v.permiso,'Permiso de circulación vence')+myField('pp-ext',v.extintor,'Renovación extintor')+
-      fld('pp-extn','Nota del extintor',v.extintorNota||'')+fld('pp-nk','Próxima mantención (km)',v.nextKm==null?'':v.nextKm,'number','min="0" inputmode="numeric"')+
       
       fld('pp-muni','Municipalidad',v.muni||'')+fld('pp-rut','RUT contribuyente',v.rut||'')+
       fld('pp-pago','Pago del permiso (link o nota)',v.pago||'')+
@@ -724,8 +726,7 @@ function cardPap(v){
     var pago=v.pago||''; var pagoH=/^https?:\/\//.test(pago)?'<a href="'+esc(pago)+'" target="_blank" rel="noopener">Abrir portal de pago</a>':esc(pago||'—');
     h+='<dl class="dl"><dt>Revisión técnica</dt><dd>'+esc(rt.lab||'—')+' '+pill(rt)+(rt.s!=='none'?'<span class="hint">aviso desde el '+rt.start.getDate()+' '+MES3[rt.start.getMonth()]+'</span>':'')+'</dd>'+
       '<dt>Permiso de circulación</dt><dd>'+esc(pe.lab||'—')+' '+pill(pe)+(pe.s!=='none'?'<span class="hint">aviso desde el '+pe.start.getDate()+' '+MES3[pe.start.getMonth()]+'</span>':'')+'</dd>'+
-      '<dt>Extintor</dt><dd>'+esc(ex.lab||'—')+' '+(ex.s!=='none'?pill(ex):'')+(v.extintorNota?'<span class="hint">'+esc(v.extintorNota)+'</span>':'')+'</dd>'+
-      '<dt>Próxima mantención</dt><dd>'+fmt(v.nextKm)+' km</dd>'+
+      '<dt>Extintor</dt><dd>'+esc(ex.lab||'—')+' '+(ex.s!=='none'?pill(ex):'')+'</dd>'+
       
       '<dt>Municipalidad</dt><dd>'+esc(v.muni||'—')+'</dd><dt>RUT contribuyente</dt><dd>'+esc(v.rut||'—')+'</dd><dt>Pago del permiso</dt><dd>'+pagoH+'</dd>'+
       (v.notas?'<dt>Notas</dt><dd>'+esc(v.notas)+'</dd>':'')+'</dl>';
@@ -774,7 +775,7 @@ function renderFlota(){
     h+='<tr><td><button class="rowbtn" data-act="open" data-id="'+v.id+'"><b>'+esc(shortName(v))+'</b><span class="plate">'+esc(v.patente)+'</span></button></td>'+
       '<td>'+(c?fmt(c.km):'—')+'</td><td>'+fmt(v.nextKm)+'<span class="sub2">'+pill(ms)+'</span></td>'+
       '<td>'+esc(rt.lab||'—')+'<span class="sub2">'+pill(rt)+'</span></td><td>'+esc(pe.lab||'—')+'<span class="sub2">'+pill(pe)+'</span></td>'+
-      '<td>'+(ex.lab?esc(ex.lab):'—')+(v.extintorNota?'<span class="sub2">'+esc(v.extintorNota)+'</span>':'')+'</td><td>'+((v.pending||[]).length)+'</td></tr>';
+      '<td>'+(ex.lab?esc(ex.lab):'—')+'</td><td>'+((v.pending||[]).length)+'</td></tr>';
   });
   $('#p-flota').innerHTML=h+'</tbody></table></div><p class="hint" style="margin-top:8px">Toca un vehículo para ver y editar toda su ficha.</p>';
 }
@@ -887,7 +888,7 @@ function getPerson(id){
   return v;
 }
 function buildChkForm(){
-  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></header><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
+  var h='<section class="card"><header><h2>Checklist de inspección</h2><span class="hint">Elige el vehículo, completa los datos y guarda. Queda en el historial de ese vehículo.</span><span class="chk-btns"><a class="btn sm manual-btn" id="chkManual" href="/manual-checklist.pdf" target="_blank" rel="noopener">VER MANUAL DE USO</a><button type="button" class="btn sm pri" id="chkToggle" data-act="chk-toggle" aria-controls="chkForm"></button></span></header><div id="chkAlert" aria-live="polite"></div><form id="chkForm" autocomplete="off">'+
    '<div class="form" style="margin-bottom:14px">'+
    '<label class="field"><span>Vehículo</span><select id="ck-veh"></select></label>'+
    '<label class="field"><span>Fecha</span><input id="ck-fecha" type="date" required></label>'+
@@ -1275,7 +1276,7 @@ document.addEventListener('click',function(e){
     case 'pap-edit': ui.edit={k:'pap'}; render(true); break;
     case 'pap-save':
       var nm=$('#pp-nombre').value.trim(), pt=$('#pp-pat').value.trim().toUpperCase(); if(!nm||!pt){toast('Nombre y patente son obligatorios.','bad');return}
-      var vals={nombre:nm,patente:pt,rt:readMY('pp-rt'),rtDia:num($('#pp-rtd').value),permiso:readMY('pp-per'),extintor:readMY('pp-ext'),extintorNota:$('#pp-extn').value.trim(),nextKm:num($('#pp-nk').value),
+      var vals={nombre:nm,patente:pt,rt:readMY('pp-rt'),rtDia:num($('#pp-rtd').value),permiso:readMY('pp-per'),extintor:readMY('pp-ext'),
         muni:$('#pp-muni').value.trim(),rut:$('#pp-rut').value.trim(),pago:$('#pp-pago').value.trim(),notas:$('#pp-notas').value.trim()};
       ui.edit=null; mutVeh(vid,Object.keys(vals),function(d){Object.assign(d,vals)}); toast('Papeles guardados'); break;
     case 'pauta-edit': ui.edit={k:'pauta'}; render(true); break;

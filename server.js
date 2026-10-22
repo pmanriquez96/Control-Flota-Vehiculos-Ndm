@@ -209,6 +209,8 @@ const sendPage = (file) => (req, res) => res.sendFile(path.join(PUB, file));
 app.get(['/', '/index.html'], (req, res) => (req.user ? sendPage('index.html')(req, res) : res.redirect('/login.html')));
 app.get('/admin.html', (req, res) => (req.user && req.user.role === 'admin' ? sendPage('admin.html')(req, res) : res.redirect('/')));
 app.get('/login.html', sendPage('login.html'));
+/* manual de uso del checklist: solo con sesión iniciada */
+app.get('/manual-checklist.pdf', (req, res) => (req.user ? res.sendFile(path.join(__dirname, 'manual', 'manual-checklist.pdf')) : res.redirect('/login.html')));
 app.use(express.static(PUB, { index: false, extensions: [], setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=300') }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'No existe' }));
 
