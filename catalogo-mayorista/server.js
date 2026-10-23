@@ -14,6 +14,9 @@ const ROLES = ['admin', 'vendedor', 'mayorista'];
 const ESTADOS = ['nuevo', 'revision', 'confirmado', 'rechazado', 'cancelado'];
 const PENDIENTES = ['nuevo', 'revision']; // pedidos que "reservan" stock
 const MAX_LINEAS = 100, MAX_QTY = 9999;
+// Se vende por juego (4 llantas por defecto). El precio de Bsale es por unidad; aquí se muestra por juego, con IVA incluido.
+const JUEGO = Math.max(1, parseInt(process.env.JUEGO_UNIDADES, 10) || 4);
+const precioJuego = (unit) => Math.round(unit * JUEGO);
 
 function createApp(pool, opts = {}) {
   const app = express();
@@ -74,7 +77,7 @@ function createApp(pool, opts = {}) {
   app.post('/api/logout', (req, res) => { auth.clearSession(res); res.json({ ok: true }); });
 
   async function meInfo(u) {
-    const out = { id: u.id, nombre: u.name, email: u.email, rol: u.role, telefono: u.phone, cambiarClave: u.must_change, empresa };
+    const out = { id: u.id, nombre: u.name, email: u.email, rol: u.role, telefono: u.phone, cambiarClave: u.must_change, empresa, juego: JUEGO };
     if (u.role === 'mayorista') {
       out.perfilCompleto = !!u.perfil_ok;
       const s = u.seller_id ? (await q('SELECT name, phone FROM users WHERE id=$1', [u.seller_id])).rows[0] : null;
@@ -111,7 +114,7 @@ function createApp(pool, opts = {}) {
   async function reservedMap() {
     const r = await q(`SELECT i.sku, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id=i.order_id
                        WHERE o.estado IN ('nuevo','revision') GROUP BY i.sku`);
-    return new Map(r.rows.map((x) => [x.sku, Number(x.n)]));
+    return new Map(r.rows.map((x) => [x.sku, Number(x.n) * JUEGO])); // unidades apartadas (los pedidos guardan juegos)
   }
   // El stock real nunca sale del servidor: solo "max", el tope que se puede pedir.
   // Orden: por diámetro de aro (el catálogo se muestra separado por aro) y luego por nombre.
@@ -121,7 +124,7 @@ function createApp(pool, opts = {}) {
       q('SELECT sku,name,category,medida,aro,ancho,pcd,et,price,stock FROM products WHERE hidden=false AND stock>0 AND price>0'),
       reservedMap(),
     ]);
-    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, p.stock - (res.get(p.sku) || 0)) })).filter((p) => p.max > 0)
+    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, Math.floor((p.stock - (res.get(p.sku) || 0)) / JUEGO)) })).filter((p) => p.max > 0)
       .sort((a, b) => aroNum(a) - aroNum(b) || a.name.localeCompare(b.name, 'es', { numeric: true }));
   }
   app.get('/api/productos', loadUser, gate, wrap(async (req, res) => {
@@ -139,7 +142,7 @@ function createApp(pool, opts = {}) {
     const ph = slice.length ? (await q(`SELECT sku,file_id FROM photos WHERE sku IN (${slice.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY sku,pos`, slice.map((p) => p.sku))).rows : [];
     const items = slice.map((p) => ({
       sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, aro: p.aro, ancho: p.ancho, pcd: p.pcd, et: p.et,
-      precio: Math.round(p.price), max: p.max,
+      precio: precioJuego(p.price), precioUnidad: Math.round(p.price), max: p.max,
       fotos: ph.filter((x) => x.sku === p.sku).map((x) => '/api/foto/' + x.file_id),
     }));
     res.json({ items, total: list.length, pagina: page, paginas: Math.max(1, Math.ceil(list.length / per)), categorias: cats, pcds, aros });
@@ -168,8 +171,8 @@ function createApp(pool, opts = {}) {
     const n = waNumber(seller && seller.phone);
     if (!n) return '';
     const c = order.cliente || {};
-    const lines = order.items.map((i) => `• ${i.sku} — ${i.name} × ${i.qty}`).join('\n');
-    const msg = `Hola ${seller.name}, soy ${c.contacto_nombre || c.razon_social}${c.razon_social ? ' (' + c.razon_social + ')' : ''}.\nAcabo de enviar el pedido ${order.codigo} en el catálogo:\n${lines}\nTotal referencial: ${clp(order.total)} + IVA.`;
+    const lines = order.items.map((i) => `• ${i.sku} — ${i.name} × ${i.qty} ${i.qty === 1 ? 'juego' : 'juegos'}`).join('\n');
+    const msg = `Hola ${seller.name}, soy ${c.contacto_nombre || c.razon_social}${c.razon_social ? ' (' + c.razon_social + ')' : ''}.\nAcabo de enviar el pedido ${order.codigo} en el catálogo:\n${lines}\nTotal referencial: ${clp(order.total)} IVA incluido.`;
     return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg);
   }
   const code = (id) => 'P-' + String(id).padStart(5, '0');
@@ -183,7 +186,7 @@ function createApp(pool, opts = {}) {
     return {
       id: o.id, codigo: code(o.id), estado: o.estado, fecha: o.created_at, actualizado: o.updated_at, notas: o.notes, notaInterna: o.internal_note,
       cliente: o.customer, vendedor: { id: o.seller_id, nombre: o.seller_name, telefono: o.seller_phone },
-      items: its, unidades: its.reduce((s, i) => s + i.qty, 0), total: its.reduce((s, i) => s + i.subtotal, 0),
+      items: its, juegos: its.reduce((s, i) => s + i.qty, 0), unidades: its.reduce((s, i) => s + i.qty, 0) * JUEGO, total: its.reduce((s, i) => s + i.subtotal, 0),
     };
   }
   // Cada rol ve solo lo suyo: admin todo · vendedor los de sus clientes · mayorista los propios
@@ -227,7 +230,7 @@ function createApp(pool, opts = {}) {
       const problemas = [];
       for (const sku of skus) {
         const p = prods.find((x) => x.sku === sku);
-        const max = p && !p.hidden && p.price > 0 ? p.stock - (resv.get(sku) || 0) : 0;
+        const max = p && !p.hidden && p.price > 0 ? Math.floor((p.stock - (resv.get(sku) || 0)) / JUEGO) : 0;
         if (!p || max <= 0) problemas.push({ sku, nombre: p ? p.name : sku, max: 0 });
         else if (want.get(sku) > max) problemas.push({ sku, nombre: p.name, max });
       }
@@ -238,7 +241,7 @@ function createApp(pool, opts = {}) {
         const o = (await client.query('INSERT INTO orders(customer_id,seller_id,notes,customer) VALUES($1,$2,$3,$4) RETURNING id', [u.id, seller.id, notes, JSON.stringify(cliente)])).rows[0];
         for (const sku of skus) {
           const p = prods.find((x) => x.sku === sku);
-          await client.query('INSERT INTO order_items(order_id,sku,name,qty,price) VALUES($1,$2,$3,$4,$5)', [o.id, sku, p.name, want.get(sku), p.price]);
+          await client.query('INSERT INTO order_items(order_id,sku,name,qty,price) VALUES($1,$2,$3,$4,$5)', [o.id, sku, p.name, want.get(sku), precioJuego(p.price)]); // qty en juegos, precio por juego
         }
         await client.query('COMMIT');
         return { id: o.id };
@@ -361,7 +364,7 @@ function createApp(pool, opts = {}) {
     const f = String(req.query.q || '');
     if (f) rows = rows.filter((p) => matches(p.sku + ' ' + p.name, f));
     const total = rows.length;
-    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: Math.round(p.price), stock: p.stock, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
+    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: precioJuego(p.price), stock: p.stock, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
   }));
   app.patch('/api/admin/productos/:sku', ...admin, wrap(async (req, res) => {
     const r = await q('UPDATE products SET hidden=$1 WHERE sku=$2', [!!(req.body || {}).oculto, String(req.params.sku).toUpperCase()]);
@@ -398,7 +401,7 @@ function sourcesFromEnv() {
         offices: (process.env.BSALE_OFFICES || 'Talca,Bodega Adicional').split(',').map((s) => s.trim()).filter(Boolean),
         priceListId: process.env.BSALE_PRICE_LIST_ID ? Number(process.env.BSALE_PRICE_LIST_ID) : null,
         priceListName: process.env.BSALE_PRICE_LIST || 'Mayorista',
-        priceMode: process.env.PRICE_MODE === 'iva' ? 'iva' : 'neto',
+        priceMode: process.env.PRICE_MODE === 'neto' ? 'neto' : 'iva', // por defecto, con IVA incluido
       },
     };
   } else console.warn('BSALE_TOKEN no definido: el catálogo no se sincroniza.');

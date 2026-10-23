@@ -94,7 +94,7 @@ function chrome() {
   if (ME.rol === 'admin') t.push(['#/usuarios', 'Usuarios'], ['#/productos', 'Productos'], ['#/sync', 'Bsale y fotos']);
   nav.innerHTML = t.map(([href, n]) => `<a href="${href}" class="${h === href || (href !== '#/' && h.startsWith(href + '/')) ? 'on' : ''}">${n}</a>`).join('');
   const n = cartCount();
-  $('#bar').innerHTML = ME.rol === 'mayorista' && n && h !== '#/carrito' && !h.startsWith('#/pedido') ? `<div class="cartbar"><b>${n} unidad${n > 1 ? 'es' : ''} en tu pedido</b><a href="#/carrito">Ver pedido</a></div>` : '';
+  $('#bar').innerHTML = ME.rol === 'mayorista' && n && h !== '#/carrito' && !h.startsWith('#/pedido') ? `<div class="cartbar"><b>${n} juego${n > 1 ? 's' : ''} en tu pedido</b><a href="#/carrito">Ver pedido</a></div>` : '';
 }
 async function refreshRes() { if (ME && ME.rol !== 'mayorista' && !ME.cambiarClave) { try { RES = await api('GET', '/api/pedidos/resumen'); chrome(); } catch (e) { /* nada */ } } }
 setInterval(refreshRes, 60000);
@@ -205,8 +205,8 @@ async function vCatalogo() {
     const specs = [p.ancho ? 'Ancho ' + p.ancho + '"' : '', p.pcd ? 'PCD ' + p.pcd : '', p.et ? 'ET ' + p.et : ''].filter(Boolean);
     return `<div class="prod"><div class="fotos">${p.fotos.length ? p.fotos.map((u) => `<div class="ph"><img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}"></div>`).join('') : '<div class="nof">Sin foto</div>'}</div>
     <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>${specs.length ? `<span class="specs">${specs.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` : ''}
-    <span class="pr">${clp(p.precio)} <small>+ IVA c/u</small></span>
-    ${buy ? (left > 0 ? `<div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Disponible para pedir: ${p.max}</span>`}</div></div>`;
+    <span class="pr">${clp(p.precio)} <small>IVA incluido · por juego de ${ME.juego}</small></span><span class="mut" style="font-size:13px">${clp(p.precioUnidad)} c/u</span>
+    ${buy ? (left > 0 ? `<span class="mut" style="font-size:12px;margin-top:6px">Cantidad de juegos (hasta ${left})</span><div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad de juegos" title="Cantidad de juegos"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} juego${inCart > 1 ? 's' : ''} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Juegos disponibles para pedir: ${p.max}</span>`}</div></div>`;
   };
   // Separado por diámetro de aro: un encabezado por cada aro
   const groups = []; r.items.forEach((p) => { let g = groups[groups.length - 1]; if (!g || g.aro !== p.aro) { g = { aro: p.aro, items: [] }; groups.push(g); } g.items.push(p); });
@@ -221,7 +221,7 @@ async function vCatalogo() {
     const input = b.parentNode.querySelector('input'), c = cartGet(), sku = b.dataset.add, max = Number(b.dataset.max);
     let n = Math.floor(Number(input.value)); if (!(n >= 1)) n = 1;
     const cur = (c[sku] || {}).qty || 0;
-    if (cur + n > max) { n = max - cur; alert('Solo puedes pedir hasta ' + max + ' unidades de este producto.'); }
+    if (cur + n > max) { n = max - cur; alert('Solo puedes pedir hasta ' + max + ' juegos de este producto.'); }
     if (n < 1) return;
     c[sku] = { qty: cur + n, nombre: b.dataset.n, precio: Number(b.dataset.p), max }; cartSet(c); chrome(); vCatalogo();
   }));
@@ -232,9 +232,9 @@ function vCarrito() {
   const c = cartGet(), skus = Object.keys(c);
   if (!skus.length) { $('#app').innerHTML = '<h1>Mi pedido</h1><div class="card mut">Aún no agregas productos. <a href="#/">Ir al catálogo</a></div>'; return; }
   const total = skus.reduce((s, k) => s + c[k].qty * c[k].precio, 0);
-  $('#app').innerHTML = `<h1>Mi pedido</h1><div class="card"><table><tr><th>SKU / Producto</th><th class="n">Cantidad</th><th class="n hide-s">Subtotal</th><th></th></tr>
-  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} + IVA c/u</span></td><td class="n"><input type="number" inputmode="numeric" min="1" max="${c[k].max}" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
-  <tr><td colspan="2" class="n"><b>Total referencial (+ IVA)</b></td><td class="n hide-s"><b>${clp(total)}</b></td><td></td></tr></table>
+  $('#app').innerHTML = `<h1>Mi pedido</h1><div class="card"><table><tr><th>SKU / Producto</th><th class="n">Juegos</th><th class="n hide-s">Subtotal</th><th></th></tr>
+  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} por juego de ${ME.juego} · IVA incl.</span></td><td class="n"><input type="number" inputmode="numeric" min="1" max="${c[k].max}" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
+  <tr><td colspan="2" class="n"><b>Total referencial (IVA incluido)</b></td><td class="n hide-s"><b>${clp(total)}</b></td><td></td></tr></table>
   <p class="mut" style="font-size:14px">Es un pedido previo: tu vendedor ${ME.vendedor ? '<b>' + esc(ME.vendedor.nombre) + '</b> ' : ''}lo revisa y lo confirma. Precios y disponibilidad pueden variar hasta entonces.</p>
   <label>Observaciones para tu vendedor (opcional)</label><textarea id="nt" rows="2" maxlength="500"></textarea><div id="m"></div>
   <div class="flex" style="margin-top:12px"><button id="send">Enviar pedido</button><button class="sec" id="clr">Vaciar</button></div></div>`;
@@ -266,9 +266,9 @@ function resumenHtml(o) {
   <span>Facturación</span><span>${esc(c.direccion)}, ${esc(c.comuna)}, ${esc(c.ciudad)} (${esc(c.region)})</span><span>Despacho</span><span>${c.despacho_igual === false ? esc(c.despacho_direccion + ', ' + c.despacho_comuna + ', ' + (c.despacho_ciudad || '')) : 'Misma dirección'}</span>
   <span>Contacto</span><span>${esc(c.contacto_nombre)} · ${esc(c.whatsapp)}${c.telefono ? ' · ' + esc(c.telefono) : ''}</span><span>Correo facturas</span><span>${esc(c.email_fact)}</span><span>Vendedor</span><span>${esc((o.vendedor || {}).nombre)}</span></div>
   ${o.notas ? `<p><b>Observaciones:</b> ${esc(o.notas)}</p>` : ''}
-  <h2 style="margin-top:14px">Detalle</h2><table><tr><th>SKU</th><th>Producto</th><th class="n">Cant.</th><th class="n hide-s">Precio</th><th class="n hide-s">Subtotal</th></tr>
+  <h2 style="margin-top:14px">Detalle</h2><table><tr><th>SKU</th><th>Producto</th><th class="n">Juegos</th><th class="n hide-s">Precio juego</th><th class="n hide-s">Subtotal</th></tr>
   ${o.items.map((i) => `<tr><td>${esc(i.sku)}</td><td>${esc(i.name)}</td><td class="n">${i.qty}</td><td class="n hide-s">${clp(i.precio)}</td><td class="n hide-s">${clp(i.subtotal)}</td></tr>`).join('')}
-  <tr><td colspan="2"><b>${o.unidades} unidades</b></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total + IVA</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table></div>`;
+  <tr><td colspan="2"><b>${o.juegos} juego${o.juegos > 1 ? 's' : ''}</b> <span class="mut">(${o.unidades} unidades)</span></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total IVA incl.</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table></div>`;
 }
 function vEnviado(r) {
   const wa = r.whatsapp;
@@ -283,8 +283,8 @@ async function vPedidos() {
   const r = await api('GET', '/api/pedidos' + (PFILT.estado ? '?estado=' + PFILT.estado : ''));
   const sel = `<select id="fe" style="width:auto"><option value="">Todos los estados</option>${Object.entries(ESTADO).map(([k, v]) => `<option value="${k}" ${PFILT.estado === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   const seller = ME.rol !== 'mayorista';
-  $('#app').innerHTML = `<div class="flex"><h1 style="margin:6px 0">${seller ? 'Pedidos' : 'Mis pedidos'}</h1><span class="right">${sel}</span></div>` + (r.items.length ? `<div class="card"><table><tr><th>N°</th><th>Fecha</th>${seller ? '<th>Cliente</th>' : ''}${ME.rol === 'admin' ? '<th class="hide-s">Vendedor</th>' : ''}<th class="n">Unid.</th><th>Estado</th></tr>` +
-    r.items.map((o) => `<tr style="cursor:pointer" data-go="${o.id}"><td><a href="#/pedido/${o.id}">${esc(o.codigo)}</a></td><td>${fdate(o.fecha)}</td>${seller ? `<td>${esc((o.cliente || {}).razon_social)}</td>` : ''}${ME.rol === 'admin' ? `<td class="hide-s">${esc((o.vendedor || {}).nombre)}</td>` : ''}<td class="n">${o.unidades}</td><td><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado])}</span></td></tr>`).join('') + '</table></div>' : '<div class="card mut">No hay pedidos.</div>');
+  $('#app').innerHTML = `<div class="flex"><h1 style="margin:6px 0">${seller ? 'Pedidos' : 'Mis pedidos'}</h1><span class="right">${sel}</span></div>` + (r.items.length ? `<div class="card"><table><tr><th>N°</th><th>Fecha</th>${seller ? '<th>Cliente</th>' : ''}${ME.rol === 'admin' ? '<th class="hide-s">Vendedor</th>' : ''}<th class="n">Juegos</th><th>Estado</th></tr>` +
+    r.items.map((o) => `<tr style="cursor:pointer" data-go="${o.id}"><td><a href="#/pedido/${o.id}">${esc(o.codigo)}</a></td><td>${fdate(o.fecha)}</td>${seller ? `<td>${esc((o.cliente || {}).razon_social)}</td>` : ''}${ME.rol === 'admin' ? `<td class="hide-s">${esc((o.vendedor || {}).nombre)}</td>` : ''}<td class="n">${o.juegos}</td><td><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado])}</span></td></tr>`).join('') + '</table></div>' : '<div class="card mut">No hay pedidos.</div>');
   $('#fe').onchange = (e) => { PFILT.estado = e.target.value; vPedidos(); };
   document.querySelectorAll('[data-go]').forEach((tr) => (tr.onclick = () => go('#/pedido/' + tr.dataset.go)));
 }
@@ -328,7 +328,7 @@ let PQ = '';
 async function vProductos() {
   const r = await api('GET', '/api/admin/productos?q=' + encodeURIComponent(PQ));
   $('#app').innerHTML = `<h1>Productos</h1><div class="card"><input id="q" type="search" placeholder="Buscar SKU o nombre" value="${esc(PQ)}"><p class="mut">${r.total} productos${r.total > 200 ? ' (mostrando 200)' : ''}. El stock es la suma de Talca + Bodega Adicional según Bsale; "reservado" son pedidos nuevos o en revisión.</p>
-  <table><tr><th>SKU / Producto</th><th class="n">Precio</th><th class="n">Stock</th><th class="n hide-s">Reserv.</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}${p.medida ? '<br><span class="mut">' + esc(p.medida) + '</span>' : ''}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
+  <table><tr><th>SKU / Producto</th><th class="n">Precio juego</th><th class="n">Stock (unid.)</th><th class="n hide-s">Reserv. (unid.)</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}${p.medida ? '<br><span class="mut">' + esc(p.medida) + '</span>' : ''}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
   <td class="n"><button class="sec sm" data-h="${esc(p.sku)}" data-v="${p.oculto ? 0 : 1}">${p.oculto ? 'Mostrar' : 'Ocultar'}</button></td></tr>`).join('')}</table></div>`;
   let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(async () => { PQ = e.target.value; await vProductos(); const i = $('#q'); i.focus(); i.setSelectionRange(PQ.length, PQ.length); }, 400); };
   document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = async () => { await api('PATCH', '/api/admin/productos/' + encodeURIComponent(b.dataset.h), { oculto: b.dataset.v === '1' }); vProductos(); }));

@@ -21,7 +21,8 @@ Ver `.env.example`. Obligatorias en producción: `DATABASE_URL`, `SESSION_SECRET
 ### Bsale
 - `BSALE_TOKEN`: access_token de la API.
 - `BSALE_OFFICES=Talca,Bodega Adicional`: nombres de sucursal (sin importar tildes ni mayúsculas). Si no encuentra alguna, lo avisa en «Bsale y fotos».
-- `BSALE_PRICE_LIST=Mayorista` (o `BSALE_PRICE_LIST_ID`). `PRICE_MODE=neto|iva`: por defecto muestra el valor neto («+ IVA»).
+- `BSALE_PRICE_LIST=Mayorista` (o `BSALE_PRICE_LIST_ID`). `PRICE_MODE=iva|neto`: por defecto toma el precio **con IVA incluido** de la lista.
+- **Precio y cantidad por juego.** El precio de Bsale es por unidad; el catálogo muestra el precio del **juego** (`JUEGO_UNIDADES`, 4 por defecto) con IVA incluido, y el cliente pide en juegos. El tope es el stock de Bsale ÷ 4 (hacia abajo). Los pedidos guardan juegos y el precio por juego del momento.
 - El SKU es el **código de la variante** en Bsale.
 
 ### Google Drive
