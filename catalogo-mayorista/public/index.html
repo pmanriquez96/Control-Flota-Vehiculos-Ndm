@@ -35,6 +35,10 @@ button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:
 .dots{position:absolute;bottom:6px;left:0;right:0;display:flex;gap:5px;justify-content:center;pointer-events:none}.dots s{width:7px;height:7px;border-radius:50%;background:#0003}.dots s.on{background:var(--az2)}
 .pb{padding:10px 12px;display:flex;flex-direction:column;gap:5px;flex:1}.pb .sku{font-size:12px;color:var(--mut)}.pb .nm{font-weight:600;font-size:15px}
 .pb .pr{font-size:20px;font-weight:700;color:var(--az)}.pb .pr small{font-size:12px;color:var(--mut);font-weight:400}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
+.chip{background:#e6edf5;color:var(--az);padding:7px 13px;border-radius:20px;white-space:nowrap;font-size:15px}.chip i{font-style:normal;opacity:.7;font-size:12px;margin-left:3px}.chip.on{background:var(--az);color:#fff}
+.aro-h{font-size:19px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--az2);color:var(--az);display:flex;align-items:baseline;gap:10px}.aro-h small{font-size:13px;color:var(--mut);font-weight:400}
+.specs{display:flex;gap:5px;flex-wrap:wrap}.specs em{font-style:normal;font-size:12px;background:#eef2f7;color:#34506f;border-radius:6px;padding:2px 7px}
 .qty{display:flex;gap:6px;margin-top:auto}.qty input{width:70px;text-align:center}.qty button{flex:1}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:13px;color:var(--mut)}td.n,th.n{text-align:right;white-space:nowrap}
 .tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:600;background:#e6edf5;color:var(--az)}
@@ -178,27 +182,35 @@ async function vPerfil(primera) {
 }
 
 /* ---- catálogo ---- */
-const CAT = { q: '', cat: '', aro: '', pagina: 1 };
+const CAT = { q: '', cat: '', aro: '', pcd: '', pagina: 1 };
+const aroTxt = (a) => (a ? 'Aro ' + a + '"' : 'Otras medidas');
 async function vCatalogo() {
   const app = $('#app');
-  if (!$('#cat-top')) app.innerHTML = `<div id="cat-top" class="card"><div class="row c3"><input id="q" type="search" placeholder="Buscar por medida (205 55 16), SKU o nombre" value="${esc(CAT.q)}"><select id="cat"></select><select id="aro"></select></div></div><div id="list"></div>`;
-  const qs = new URLSearchParams({ q: CAT.q, cat: CAT.cat, aro: CAT.aro, pagina: CAT.pagina });
+  if (!$('#cat-top')) app.innerHTML = `<div id="cat-top" class="card"><div class="row c3"><input id="q" type="search" placeholder="Buscar por SKU, nombre o PCD (5x114)" value="${esc(CAT.q)}"><select id="cat"></select><select id="pcd"></select></div><div class="chips" id="aros"></div></div><div id="list"></div>`;
+  const qs = new URLSearchParams({ q: CAT.q, cat: CAT.cat, aro: CAT.aro, pcd: CAT.pcd, pagina: CAT.pagina });
   const r = await api('GET', '/api/productos?' + qs);
   if (!$('#list')) return; // cambió de pantalla mientras cargaba
   const opt = (arr, v, all) => `<option value="">${all}</option>` + arr.map((x) => `<option ${x === v ? 'selected' : ''} value="${esc(x)}">${esc(x)}</option>`).join('');
-  $('#cat').innerHTML = opt(r.categorias, CAT.cat, 'Todas las categorías'); $('#cat').hidden = !r.categorias.length;
-  $('#aro').innerHTML = opt(r.aros, CAT.aro, 'Todos los aros');
+  $('#cat').innerHTML = opt(r.categorias, CAT.cat, 'Todos los tipos'); $('#cat').hidden = !r.categorias.length;
+  $('#pcd').innerHTML = opt(r.pcds, CAT.pcd, 'Todos los PCD (pernos)'); $('#pcd').hidden = !r.pcds.length;
+  const totalAros = r.aros.reduce((n, x) => n + x.n, 0);
+  $('#aros').innerHTML = `<button class="chip ${CAT.aro ? '' : 'on'}" data-aro="">Todos <i>${totalAros}</i></button>` + r.aros.map((x) => { const k = x.aro || 'otros'; return `<button class="chip ${CAT.aro === k ? 'on' : ''}" data-aro="${esc(k)}">${x.aro ? 'Aro ' + esc(x.aro) + '"' : 'Otras'} <i>${x.n}</i></button>`; }).join('');
+  document.querySelectorAll('[data-aro]').forEach((b) => (b.onclick = () => { CAT.aro = b.dataset.aro; CAT.pagina = 1; vCatalogo(); }));
   let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { CAT.q = e.target.value; CAT.pagina = 1; vCatalogo(); }, 350); };
   $('#cat').onchange = (e) => { CAT.cat = e.target.value; CAT.pagina = 1; vCatalogo(); };
-  $('#aro').onchange = (e) => { CAT.aro = e.target.value; CAT.pagina = 1; vCatalogo(); };
+  $('#pcd').onchange = (e) => { CAT.pcd = e.target.value; CAT.pagina = 1; vCatalogo(); };
   const cart = cartGet(), buy = ME.rol === 'mayorista';
-  $('#list').innerHTML = (r.items.length ? `<div class="grid">${r.items.map((p) => {
+  const card = (p) => {
     const inCart = (cart[p.sku] || {}).qty || 0, left = Math.max(0, p.max - inCart);
+    const specs = [p.ancho ? 'Ancho ' + p.ancho + '"' : '', p.pcd ? 'PCD ' + p.pcd : '', p.et ? 'ET ' + p.et : ''].filter(Boolean);
     return `<div class="prod"><div class="fotos">${p.fotos.length ? `<div class="sl">${p.fotos.map((u) => `<img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}">`).join('')}</div>${p.fotos.length > 1 ? `<div class="dots">${p.fotos.map((_, i) => `<s class="${i ? '' : 'on'}"></s>`).join('')}</div>` : ''}` : '<div class="nof">Sin foto</div>'}</div>
-    <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>
+    <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>${specs.length ? `<span class="specs">${specs.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` : ''}
     <span class="pr">${clp(p.precio)} <small>+ IVA c/u</small></span>
     ${buy ? (left > 0 ? `<div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Disponible para pedir: ${p.max}</span>`}</div></div>`;
-  }).join('')}</div>` : '<div class="card mut">No encontramos productos con esos filtros.</div>') +
+  };
+  // Separado por diámetro de aro: un encabezado por cada aro
+  const groups = []; r.items.forEach((p) => { let g = groups[groups.length - 1]; if (!g || g.aro !== p.aro) { g = { aro: p.aro, items: [] }; groups.push(g); } g.items.push(p); });
+  $('#list').innerHTML = (groups.length ? groups.map((g) => `<h2 class="aro-h">${aroTxt(g.aro)} <small>${r.aros.find((x) => x.aro === g.aro) ? r.aros.find((x) => x.aro === g.aro).n : g.items.length} modelos</small></h2><div class="grid">${g.items.map(card).join('')}</div>`).join('') : '<div class="card mut">No encontramos productos con esos filtros.</div>') +
     `<div class="pager"><button class="sec sm" id="pp" ${r.pagina <= 1 ? 'disabled' : ''}>← Anterior</button><span>Página ${r.pagina} de ${r.paginas} · ${r.total} productos</span><button class="sec sm" id="pn" ${r.pagina >= r.paginas ? 'disabled' : ''}>Siguiente →</button></div><div class="pad"></div>`;
   $('#pp').onclick = () => { CAT.pagina--; vCatalogo(); scrollTo(0, 0); };
   $('#pn').onclick = () => { CAT.pagina++; vCatalogo(); scrollTo(0, 0); };
@@ -316,7 +328,7 @@ let PQ = '';
 async function vProductos() {
   const r = await api('GET', '/api/admin/productos?q=' + encodeURIComponent(PQ));
   $('#app').innerHTML = `<h1>Productos</h1><div class="card"><input id="q" type="search" placeholder="Buscar SKU o nombre" value="${esc(PQ)}"><p class="mut">${r.total} productos${r.total > 200 ? ' (mostrando 200)' : ''}. El stock es la suma de Talca + Bodega Adicional según Bsale; "reservado" son pedidos nuevos o en revisión.</p>
-  <table><tr><th>SKU / Producto</th><th class="n">Precio</th><th class="n">Stock</th><th class="n hide-s">Reserv.</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
+  <table><tr><th>SKU / Producto</th><th class="n">Precio</th><th class="n">Stock</th><th class="n hide-s">Reserv.</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}${p.medida ? '<br><span class="mut">' + esc(p.medida) + '</span>' : ''}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
   <td class="n"><button class="sec sm" data-h="${esc(p.sku)}" data-v="${p.oculto ? 0 : 1}">${p.oculto ? 'Mostrar' : 'Ocultar'}</button></td></tr>`).join('')}</table></div>`;
   let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(async () => { PQ = e.target.value; await vProductos(); const i = $('#q'); i.focus(); i.setSelectionRange(PQ.length, PQ.length); }, 400); };
   document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = async () => { await api('PATCH', '/api/admin/productos/' + encodeURIComponent(b.dataset.h), { oculto: b.dataset.v === '1' }); vProductos(); }));

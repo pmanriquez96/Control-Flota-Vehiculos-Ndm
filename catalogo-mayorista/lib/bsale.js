@@ -41,12 +41,31 @@ function pickOffices(offices, wanted) {
   );
 }
 
-// Medida "205/55R16" -> {medida, aro}
-function parseMedida(name) {
-  const m = String(name).match(/(\d{3})\s*[\/xX]\s*(\d{2,3}(?:[.,]\d)?)\s*(?:Z?R|ZR|-)?\s*(\d{2}(?:[.,]\d)?)/);
-  if (m) return { medida: `${m[1]}/${m[2]}R${m[3]}`.replace(',', '.'), aro: m[3].replace(',', '.') };
-  const a = String(name).match(/\bR\s?(\d{2})\b/i);
-  return { medida: '', aro: a ? a[1] : '' };
+// Datos del rin que vienen en el nombre: "LLANTA ALEACION 16X7 5X114.3 ET40" -> aro 16, ancho 7, PCD 5x114.3, ET 40
+function parseRin(name) {
+  let s = ' ' + String(name).toUpperCase().replace(/,/g, '.') + ' ';
+  const out = { aro: '', ancho: '', pcd: '', et: '' };
+  // PCD: pernos x distancia (5X114.3, 4X100, 5/112, 6H139.7, 5X100/114.3)
+  const re = /(?<![\d.])([3-8])\s*(?:X|\/|H)\s*(\d{2,3}(?:\.\d{1,2})?)(?:\s*\/\s*(\d{2,3}(?:\.\d{1,2})?))?(?![\d])/g;
+  let m;
+  while ((m = re.exec(s))) {
+    if (Number(m[2]) >= 98 && Number(m[2]) <= 180) {
+      out.pcd = m[1] + 'x' + m[2] + (m[3] ? '/' + m[3] : '');
+      s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length);
+      break;
+    }
+  }
+  const et = s.match(/\bET\s?(-?\d{1,3})\b/);
+  if (et) out.et = et[1];
+  // Aro y ancho: "16X7", "7JX16", "17X7.5": el mayor (12 a 26) es el aro y el otro el ancho (4 a 14)
+  const d = s.match(/(?<![\d.])(\d{1,2}(?:\.\d)?)\s*J?\s*X\s*(\d{1,2}(?:\.\d)?)(?![\d])/);
+  if (d) {
+    const a = Number(d[1]), b = Number(d[2]), hi = Math.max(a, b), lo = Math.min(a, b);
+    if (hi >= 12 && hi <= 26 && lo >= 4 && lo <= 14) { out.aro = String(hi); out.ancho = String(lo); }
+  }
+  if (!out.aro) { const r = s.match(/\b(?:ARO|RIN|R)\s?(\d{2})\b/); if (r) out.aro = r[1]; }
+  out.medida = [out.aro && out.ancho ? out.aro + 'x' + out.ancho : out.aro ? 'Aro ' + out.aro : '', out.pcd, out.et ? 'ET' + out.et : ''].filter(Boolean).join(' · ');
+  return out;
 }
 
 async function fetchCatalog(client, opts) {
@@ -102,10 +121,10 @@ async function fetchCatalog(client, opts) {
     if (desc && !norm(name).includes(norm(desc))) name = (name + ' ' + desc).trim();
     if (!name) name = sku;
     const typeId = prod.productType && prod.productType.id;
-    const pm = parseMedida(name);
+    const pm = parseRin(name);
     items.push({
       sku, variantId: v.id, name, category: types.get(typeId) || '',
-      medida: pm.medida, aro: pm.aro,
+      medida: pm.medida, aro: pm.aro, ancho: pm.ancho, pcd: pm.pcd, et: pm.et,
       price: price.get(v.id) || 0,
       stock: Math.max(0, Math.floor(stock.get(v.id) || 0)),
     });
@@ -113,4 +132,4 @@ async function fetchCatalog(client, opts) {
   return { items, offices: chosen.map((o) => o.name), priceListId: plId };
 }
 
-module.exports = { makeClient, fetchCatalog, pickOffices, parseMedida, norm };
+module.exports = { makeClient, fetchCatalog, pickOffices, parseRin, norm };

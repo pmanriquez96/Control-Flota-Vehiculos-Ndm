@@ -1,10 +1,11 @@
-# Catálogo mayorista de llantas
+# Catálogo mayorista de llantas (rines)
 
 Proyecto independiente (vive en esta carpeta para poder moverlo a su propio repositorio sin cambios). Node + Express + Postgres, interfaz en un solo `public/index.html`.
 
 ## Qué hace
 
 - **Bsale → catálogo automático.** Cada `SYNC_MINUTES` (15 por defecto) suma el stock de las sucursales **Talca** y **Bodega Adicional** y trae el precio de la lista **Mayorista**, más nombre y categoría. Solo se muestran productos con stock y precio.
+- **Separado por aro.** «Llantas» = rines. El catálogo se agrupa por diámetro de aro (14", 15", 16"…) con fichas de aro arriba (con la cantidad de modelos) y filtros por tipo y por PCD (pernos). Cada ficha muestra ancho, PCD y ET. Esos datos se leen del **nombre del producto en Bsale** (`lib/bsale.js → parseRin`): conviene escribirlos como `16X7 5X114.3 ET40` (también entiende `7Jx16`, `5/112`, `6H139.7`, `4X100/108`). Lo que no se pueda leer queda en «Otras».
 - **Fotos desde Google Drive** por SKU (hasta 3). El servidor las descarga con una cuenta de servicio y las guarda en `CACHE_DIR`; el navegador nunca ve Drive.
 - **Stock oculto.** La API pública no entrega el stock: solo `max`, el tope que el cliente puede elegir (stock − lo ya reservado por pedidos nuevos o en revisión). El servidor vuelve a validar al enviar el pedido, uno a la vez.
 - **Usuarios y roles.** El administrador crea usuarios y entrega una clave temporal.

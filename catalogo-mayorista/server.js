@@ -114,27 +114,35 @@ function createApp(pool, opts = {}) {
     return new Map(r.rows.map((x) => [x.sku, Number(x.n)]));
   }
   // El stock real nunca sale del servidor: solo "max", el tope que se puede pedir.
+  // Orden: por diámetro de aro (el catálogo se muestra separado por aro) y luego por nombre.
+  const aroNum = (p) => (p.aro ? Number(p.aro) : 999);
   async function visibleProducts() {
     const [rows, res] = await Promise.all([
-      q('SELECT sku,name,category,medida,aro,price,stock FROM products WHERE hidden=false AND stock>0 AND price>0 ORDER BY name'),
+      q('SELECT sku,name,category,medida,aro,ancho,pcd,et,price,stock FROM products WHERE hidden=false AND stock>0 AND price>0'),
       reservedMap(),
     ]);
-    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, p.stock - (res.get(p.sku) || 0)) })).filter((p) => p.max > 0);
+    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, p.stock - (res.get(p.sku) || 0)) })).filter((p) => p.max > 0)
+      .sort((a, b) => aroNum(a) - aroNum(b) || a.name.localeCompare(b.name, 'es', { numeric: true }));
   }
   app.get('/api/productos', loadUser, gate, wrap(async (req, res) => {
-    const { q: busca = '', cat = '', aro = '' } = req.query;
+    const { q: busca = '', cat = '', aro = '', pcd = '' } = req.query;
     const page = Math.max(1, parseInt(req.query.pagina, 10) || 1), per = 24;
     const all = await visibleProducts();
     const cats = [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
-    const aros = [...new Set(all.map((p) => p.aro).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
-    const list = all.filter((p) => (!cat || p.category === cat) && (!aro || p.aro === aro) && matches(p.sku + ' ' + p.name + ' ' + p.medida, String(busca)));
+    const pcds = [...new Set(all.map((p) => p.pcd).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+    const base = all.filter((p) => (!cat || p.category === cat) && (!pcd || p.pcd === pcd) && matches(p.sku + ' ' + p.name + ' ' + p.medida, String(busca)));
+    // cuántos modelos hay en cada aro con los demás filtros aplicados (para las fichas de aro)
+    const count = new Map(); base.forEach((p) => count.set(p.aro, (count.get(p.aro) || 0) + 1));
+    const aros = [...count].map(([a, n]) => ({ aro: a, n })).sort((x, y) => (x.aro ? Number(x.aro) : 999) - (y.aro ? Number(y.aro) : 999));
+    const list = base.filter((p) => !aro || p.aro === (aro === 'otros' ? '' : aro));
     const slice = list.slice((page - 1) * per, page * per);
     const ph = slice.length ? (await q(`SELECT sku,file_id FROM photos WHERE sku IN (${slice.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY sku,pos`, slice.map((p) => p.sku))).rows : [];
     const items = slice.map((p) => ({
-      sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: Math.round(p.price), max: p.max,
+      sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, aro: p.aro, ancho: p.ancho, pcd: p.pcd, et: p.et,
+      precio: Math.round(p.price), max: p.max,
       fotos: ph.filter((x) => x.sku === p.sku).map((x) => '/api/foto/' + x.file_id),
     }));
-    res.json({ items, total: list.length, pagina: page, paginas: Math.max(1, Math.ceil(list.length / per)), categorias: cats, aros });
+    res.json({ items, total: list.length, pagina: page, paginas: Math.max(1, Math.ceil(list.length / per)), categorias: cats, pcds, aros });
   }));
 
   // Foto de Drive (solo las que están en el catálogo y con sesión iniciada), guardada en disco para no llamar a Google cada vez
@@ -349,11 +357,11 @@ function createApp(pool, opts = {}) {
   app.get('/api/admin/productos', ...admin, wrap(async (req, res) => {
     const resv = await reservedMap();
     const ph = new Map((await q('SELECT sku, COUNT(*) AS n FROM photos GROUP BY sku')).rows.map((x) => [x.sku, Number(x.n)]));
-    let rows = (await q('SELECT sku,name,category,price,stock,hidden FROM products ORDER BY name')).rows;
+    let rows = (await q('SELECT sku,name,category,medida,price,stock,hidden FROM products ORDER BY name')).rows;
     const f = String(req.query.q || '');
     if (f) rows = rows.filter((p) => matches(p.sku + ' ' + p.name, f));
     const total = rows.length;
-    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, precio: Math.round(p.price), stock: p.stock, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
+    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: Math.round(p.price), stock: p.stock, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
   }));
   app.patch('/api/admin/productos/:sku', ...admin, wrap(async (req, res) => {
     const r = await q('UPDATE products SET hidden=$1 WHERE sku=$2', [!!(req.body || {}).oculto, String(req.params.sku).toUpperCase()]);

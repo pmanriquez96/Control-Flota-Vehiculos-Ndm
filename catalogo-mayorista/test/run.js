@@ -8,7 +8,7 @@ const { newDb } = require('pg-mem');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
 const { createApp } = require('../server');
-const { makeClient, parseMedida } = require('../lib/bsale');
+const { makeClient, parseRin } = require('../lib/bsale');
 const { formatRut } = require('../lib/rut');
 const { makeDrive } = require('../lib/drive');
 
@@ -21,7 +21,7 @@ const page = (all, url) => {
   const items = all.slice(off, off + lim);
   return { count: all.length, limit: lim, offset: off, items, next: off + lim < all.length ? 'x' : undefined };
 };
-const state = { talca: { 1: 10, 2: 4, 3: 0 }, bodega: { 1: 5, 2: 0, 3: 0, 4: 7 } }; // 4: sin precio
+const state = { talca: { 1: 10, 2: 4, 3: 0, 5: 0 }, bodega: { 1: 5, 2: 0, 3: 0, 4: 7, 5: 0 } }; // 4: sin precio
 function fakeBsale(url) {
   const p = new URL(url).pathname.replace('/v1', '');
   const stocks = (m, oid) => Object.entries(m).map(([v, q]) => ({ quantity: q, quantityAvailable: q, variant: { id: Number(v) }, office: { id: oid } }));
@@ -35,10 +35,11 @@ function fakeBsale(url) {
       { variant: { id: 3 }, variantValue: 70000, variantValueWithTaxes: 83300 }], url);
     if (p === '/product_types.json') return page([{ id: 5, name: 'Llantas' }], url);
     if (p === '/variants.json') return page([
-      { id: 1, code: 'ab-205', description: '', product: { name: 'LLANTA 205/55R16 91V MARCA X', productType: { id: 5 } } },
-      { id: 2, code: 'ab-265', description: '265/70R17', product: { name: 'LLANTA CAMIONETA', productType: { id: 5 } } },
-      { id: 3, code: 'ab-agotado', description: '', product: { name: 'LLANTA AGOTADA 195/65R15', productType: { id: 5 } } },
-      { id: 4, code: 'ab-sinprecio', description: '', product: { name: 'LLANTA SIN PRECIO', productType: { id: 5 } } }], url);
+      { id: 1, code: 'ab-205', description: '', product: { name: 'LLANTA ALEACION 16X7 5X114.3 ET40 NEGRO', productType: { id: 5 } } },
+      { id: 2, code: 'ab-265', description: '17X7.5 6X139.7 ET25', product: { name: 'LLANTA ACERO', productType: { id: 5 } } },
+      { id: 3, code: 'ab-agotado', description: '', product: { name: 'LLANTA AGOTADA 15X6 4X100', productType: { id: 5 } } },
+      { id: 4, code: 'ab-sinprecio', description: '', product: { name: 'LLANTA SIN PRECIO', productType: { id: 5 } } },
+      { id: 5, code: 'ab-sinstock', description: '', product: { name: 'LLANTA 14X5.5 4X100', productType: { id: 5 } } }], url);
     throw new Error('ruta no simulada ' + p);
   })();
   return { ok: true, status: 200, json: async () => body };
@@ -67,7 +68,10 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
 (async () => {
   // utilidades
   ok(formatRut('76086428-5') === '76.086.428-5' && formatRut('11.111.111-1') === '11.111.111-1' && !formatRut('11.111.111-2'), 'RUT: módulo 11');
-  ok(parseMedida('LLANTA 205/55R16 91V').aro === '16' && parseMedida('x 265/70 R17').medida === '265/70R17', 'medida y aro desde el nombre');
+  const q1 = parseRin('LLANTA ALEACION 16X7 5X114.3 ET40'), q2 = parseRin('Rin 7Jx17 5/112 ET-5'), q3 = parseRin('LLANTA ACERO 15 X 6 4X100/108'), q4 = parseRin('RIN ARO 14 NEGRO'), q5 = parseRin('LLANTA 17X8.5 6H139.7 ET20');
+  ok(q1.aro === '16' && q1.ancho === '7' && q1.pcd === '5x114.3' && q1.et === '40' && q1.medida === '16x7 · 5x114.3 · ET40', 'rin: aro, ancho, PCD y ET desde el nombre');
+  ok(q2.aro === '17' && q2.ancho === '7' && q2.pcd === '5x112' && q2.et === '-5', 'rin: 7Jx17 5/112 ET-5');
+  ok(q3.aro === '15' && q3.pcd === '4x100/108' && q4.aro === '14' && !q4.pcd && q5.pcd === '6x139.7' && q5.aro === '17' && q5.ancho === '8.5', 'rin: PCD doble, solo aro, 6H139.7 y ancho 8.5');
   // Drive real: índice con archivos sueltos y subcarpetas (Google simulado)
   const rsa = require('crypto').generateKeyPairSync('rsa', { modulusLength: 2048 });
   const files = {
@@ -99,10 +103,10 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
 
   // sincronización
   const sy = await app.doSync(true);
-  ok(sy.ok && sy.productos === 4 && sy.conStock === 2 && sy.sucursales.length === 2 && sy.fotos === 4, 'sync: 4 productos, 2 visibles, 2 sucursales, 4 fotos ' + JSON.stringify(sy));
+  ok(sy.ok && sy.productos === 5 && sy.conStock === 2 && sy.sucursales.length === 2 && sy.fotos === 4, 'sync: 5 productos, 2 visibles, 2 sucursales, 4 fotos ' + JSON.stringify(sy));
   const ap = (await call(A, 'GET', '/api/admin/productos')).j.items;
   ok(ap.find((p) => p.sku === 'AB-205').stock === 15 && ap.find((p) => p.sku === 'AB-265').stock === 4, 'stock = Talca + Bodega Adicional (10+5, 4+0); Casa Matriz no cuenta');
-  ok(ap.find((p) => p.sku === 'AB-265').nombre === 'LLANTA CAMIONETA 265/70R17', 'nombre = producto + variante');
+  ok(ap.find((p) => p.sku === 'AB-265').nombre === 'LLANTA ACERO 17X7.5 6X139.7 ET25' && ap.find((p) => p.sku === 'AB-265').medida === '17x7.5 · 6x139.7 · ET25', 'nombre = producto + variante, con su medida');
 
   // usuarios
   const mk = (b) => call(A, 'POST', '/api/admin/usuarios', b);
@@ -143,8 +147,12 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const p205 = cat.items.find((p) => p.sku === 'AB-205');
   ok(p205.precio === 50000 && p205.max === 15 && p205.fotos.length === 3 && !('stock' in p205), 'precio mayorista, tope = disponible, 3 fotos y sin campo stock');
   ok(!JSON.stringify(cat).includes('"stock"'), 'la respuesta pública no trae stock');
-  ok((await call(M1, 'GET', '/api/productos?q=' + encodeURIComponent('205 55 16'))).j.total === 1, 'busca por medida "205 55 16"');
+  ok(cat.items.map((p) => p.aro).join() === '16,17' && cat.aros.map((a) => a.aro + ':' + a.n).join() === '16:1,17:1', 'catálogo separado y ordenado por aro (16, 17) con conteo');
+  ok(p205.aro === '16' && p205.ancho === '7' && p205.pcd === '5x114.3' && p205.et === '40', 'ficha con aro, ancho, PCD y ET');
+  ok((await call(M1, 'GET', '/api/productos?q=' + encodeURIComponent('5x114'))).j.total === 1, 'busca por PCD "5x114"');
   ok((await call(M1, 'GET', '/api/productos?aro=17')).j.items[0].sku === 'AB-265', 'filtra por aro');
+  const fp = (await call(M1, 'GET', '/api/productos?pcd=' + encodeURIComponent('6x139.7'))).j;
+  ok(fp.total === 1 && fp.pcds.join() === '5x114.3,6x139.7' && fp.aros.length === 1, 'filtra por PCD y los aros se recalculan');
   const foto = await call(M1, 'GET', p205.fotos[0].replace('', ''));
   ok(foto.s === 200 && foto.ct.includes('image/jpeg'), 'sirve la foto desde Drive (con sesión)');
   ok((await call('', 'GET', p205.fotos[0])).s === 401 && (await call(M1, 'GET', '/api/foto/archivoQueNoExiste1')).s === 404, 'foto sin sesión o fuera del catálogo: no');
@@ -158,7 +166,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const o1 = await ped([{ sku: 'ab-205', qty: 6 }, { sku: 'AB-205', qty: 2 }, { sku: 'AB-265', qty: 4 }], 'Despachar mañana');
   ok(o1.s === 200 && o1.j.pedido.codigo === 'P-00001' && o1.j.pedido.items.length === 2 && o1.j.pedido.unidades === 12, 'crea el pedido (junta líneas repetidas)');
   ok(o1.j.pedido.cliente.razon_social === 'Neumáticos Sur SpA' && o1.j.pedido.total === 8 * 50000 + 4 * 80000, 'resumen con datos del cliente y total');
-  ok(o1.j.whatsapp.startsWith('https://wa.me/56987654321?text=') && decodeURIComponent(o1.j.whatsapp).includes('AB-205 — LLANTA 205/55R16 91V MARCA X × 8'), 'enlace de WhatsApp al vendedor con el resumen');
+  ok(o1.j.whatsapp.startsWith('https://wa.me/56987654321?text=') && decodeURIComponent(o1.j.whatsapp).includes('AB-205 — LLANTA ALEACION 16X7 5X114.3 ET40 NEGRO × 8'), 'enlace de WhatsApp al vendedor con el resumen');
   const cat2 = (await call(M1, 'GET', '/api/productos')).j;
   ok(cat2.items.length === 1 && cat2.items[0].max === 7, 'el pedido reserva stock (agotó AB-265, quedan 7 de AB-205)');
   // carreras: dos pedidos a la vez por lo último que queda
