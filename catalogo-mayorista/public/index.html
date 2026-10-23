@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f3d6e">
+<title>Catálogo mayorista</title>
+<style>
+:root{--az:#0f3d6e;--az2:#1b5ea8;--bg:#f2f5f9;--card:#fff;--tx:#17212b;--mut:#64707d;--bd:#d9e0e8;--ok:#1a7f45;--warn:#b26a00;--mal:#c0392b;--rad:12px}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:var(--az);color:#fff;position:sticky;top:0;z-index:20}
+.hd{display:flex;align-items:center;gap:10px;padding:10px 14px;max-width:1100px;margin:auto}
+.hd b{font-size:17px;flex:1}.hd small{opacity:.8;display:block;font-weight:400;font-size:12px}
+nav{display:flex;gap:4px;overflow-x:auto;padding:0 10px 8px;max-width:1100px;margin:auto}
+nav a{color:#fff;opacity:.85;text-decoration:none;padding:7px 12px;border-radius:20px;white-space:nowrap;font-size:15px}
+nav a.on{background:#ffffff26;opacity:1;font-weight:600}nav a i{font-style:normal;background:#f5b301;color:#222;border-radius:10px;padding:0 7px;margin-left:5px;font-size:12px}
+main{max-width:1100px;margin:auto;padding:14px}
+h1{font-size:21px;margin:6px 0 12px}h2{font-size:17px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--rad);padding:14px;margin-bottom:12px}
+label{display:block;font-size:14px;color:var(--mut);margin:10px 0 3px}
+input,select,textarea{width:100%;padding:11px 12px;font:inherit;border:1px solid var(--bd);border-radius:9px;background:#fff;color:var(--tx)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--az2);border-color:var(--az2)}
+.bad input,.bad select{border-color:var(--mal)}.err{color:var(--mal);font-size:13px;margin-top:3px}
+.row{display:grid;gap:10px}@media(min-width:640px){.row.c2{grid-template-columns:1fr 1fr}.row.c3{grid-template-columns:1fr 1fr 1fr}}
+button,.btn{font:inherit;border:0;border-radius:10px;padding:11px 16px;background:var(--az2);color:#fff;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;text-align:center}
+button.sec,.btn.sec{background:#e6edf5;color:var(--az)}button.mal{background:var(--mal)}button.wa,.btn.wa{background:#1fa855}button:disabled{opacity:.5}
+button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.msg{padding:10px 12px;border-radius:9px;margin:10px 0;font-size:15px}.msg.e{background:#fdecea;color:#8d2418}.msg.o{background:#e6f5ec;color:#145c32}.msg.i{background:#e8f0fb;color:#173f73}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.prod{background:#fff;border:1px solid var(--bd);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column}
+.fotos{position:relative;aspect-ratio:4/3;background:#e9eef4;overflow:hidden}
+.fotos .sl{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.fotos .sl::-webkit-scrollbar{display:none}
+.fotos img{flex:0 0 100%;width:100%;height:100%;object-fit:contain;scroll-snap-align:center;background:#fff}
+.fotos .nof{display:grid;place-items:center;height:100%;color:var(--mut);font-size:14px}
+.dots{position:absolute;bottom:6px;left:0;right:0;display:flex;gap:5px;justify-content:center;pointer-events:none}.dots s{width:7px;height:7px;border-radius:50%;background:#0003}.dots s.on{background:var(--az2)}
+.pb{padding:10px 12px;display:flex;flex-direction:column;gap:5px;flex:1}.pb .sku{font-size:12px;color:var(--mut)}.pb .nm{font-weight:600;font-size:15px}
+.pb .pr{font-size:20px;font-weight:700;color:var(--az)}.pb .pr small{font-size:12px;color:var(--mut);font-weight:400}
+.qty{display:flex;gap:6px;margin-top:auto}.qty input{width:70px;text-align:center}.qty button{flex:1}
+table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:13px;color:var(--mut)}td.n,th.n{text-align:right;white-space:nowrap}
+.tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:600;background:#e6edf5;color:var(--az)}
+.tag.nuevo{background:#fff2d6;color:#8a5a00}.tag.revision{background:#e1ecfb;color:#154c93}.tag.confirmado{background:#dff3e7;color:#146c3a}.tag.rechazado,.tag.cancelado{background:#fde5e2;color:#9b2a1e}
+.pager{display:flex;gap:10px;justify-content:center;align-items:center;margin:14px 0}
+.cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--az);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:15;box-shadow:0 -2px 10px #0003}
+.cartbar b{flex:1}.cartbar a{background:#fff;color:var(--az);padding:9px 16px;border-radius:10px;font-weight:700;text-decoration:none}
+.pad{height:70px}.login{max-width:380px;margin:9vh auto}.mut{color:var(--mut)}.big{font-size:19px;font-weight:700}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:4px 10px;font-size:15px}.kv span:nth-child(odd){color:var(--mut)}
+.clave{font:700 22px ui-monospace,monospace;background:#fff8dc;border:1px dashed #c9a400;padding:10px;text-align:center;border-radius:9px;letter-spacing:1px;user-select:all}
+@media(max-width:560px){.hide-s{display:none}}
+</style>
+</head>
+<body>
+<header><div class="hd"><b id="ttl">Catálogo mayorista<small id="sub"></small></b><span id="who" class="hide-s" style="font-size:14px;opacity:.9"></span><button class="sec sm" id="out" hidden>Salir</button></div><nav id="nav"></nav></header>
+<main id="app"></main>
+<div id="bar"></div>
+<script>
+'use strict';
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clp = (n) => '$' + Math.round(n).toLocaleString('es-CL');
+const fdate = (d) => new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const ESTADO = { nuevo: 'Nuevo', revision: 'En revisión', confirmado: 'Confirmado', rechazado: 'Rechazado', cancelado: 'Cancelado' };
+let ME = null, REG = [], RES = {};
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: body !== undefined ? { 'Content-Type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
+  let j = {}; try { j = await r.json(); } catch (e) { /* sin cuerpo */ }
+  if (r.status === 401 && ME) { ME = null; go('#/'); render(); }
+  if (!r.ok) { const e = new Error(j.error || 'Error ' + r.status); e.data = j; e.status = r.status; throw e; }
+  return j;
+}
+const go = (h) => { if (location.hash !== h) location.hash = h; };
+
+/* ---- carrito (guardado en este celular, uno por usuario) ---- */
+const cartKey = () => 'cat_cart_' + (ME ? ME.id : 0);
+function cartGet() { try { return JSON.parse(localStorage.getItem(cartKey())) || {}; } catch (e) { return {}; } }
+function cartSet(c) { try { localStorage.setItem(cartKey(), JSON.stringify(c)); } catch (e) { /* sin guardado */ } }
+const cartCount = () => Object.values(cartGet()).reduce((s, i) => s + i.qty, 0);
+
+/* ---- estructura ---- */
+function chrome() {
+  $('#sub').textContent = ME ? ME.empresa : '';
+  $('#who').textContent = ME ? ME.nombre : '';
+  $('#out').hidden = !ME;
+  const nav = $('#nav');
+  if (!ME || ME.cambiarClave || (ME.rol === 'mayorista' && !ME.perfilCompleto)) { nav.innerHTML = ''; $('#bar').innerHTML = ''; return; }
+  const h = location.hash || '#/';
+  const t = [['#/', 'Catálogo']];
+  if (ME.rol === 'mayorista') t.push(['#/carrito', 'Mi pedido' + (cartCount() ? ' <i>' + cartCount() + '</i>' : '')], ['#/pedidos', 'Mis pedidos'], ['#/cuenta', 'Mis datos']);
+  else t.push(['#/pedidos', 'Pedidos' + ((RES.nuevo || 0) ? ' <i>' + RES.nuevo + '</i>' : '')], ['#/cuenta', 'Mi clave']);
+  if (ME.rol === 'admin') t.push(['#/usuarios', 'Usuarios'], ['#/productos', 'Productos'], ['#/sync', 'Bsale y fotos']);
+  nav.innerHTML = t.map(([href, n]) => `<a href="${href}" class="${h === href || (href !== '#/' && h.startsWith(href + '/')) ? 'on' : ''}">${n}</a>`).join('');
+  const n = cartCount();
+  $('#bar').innerHTML = ME.rol === 'mayorista' && n && h !== '#/carrito' && !h.startsWith('#/pedido') ? `<div class="cartbar"><b>${n} unidad${n > 1 ? 'es' : ''} en tu pedido</b><a href="#/carrito">Ver pedido</a></div>` : '';
+}
+async function refreshRes() { if (ME && ME.rol !== 'mayorista' && !ME.cambiarClave) { try { RES = await api('GET', '/api/pedidos/resumen'); chrome(); } catch (e) { /* nada */ } } }
+setInterval(refreshRes, 60000);
+
+async function render() {
+  const app = $('#app');
+  if (!ME) { try { ME = await api('GET', '/api/me'); } catch (e) { ME = null; } }
+  if (!ME) { chrome(); return vLogin(); }
+  if (ME.cambiarClave) { chrome(); return vClave(true); }
+  if (ME.rol === 'mayorista' && !ME.perfilCompleto) { chrome(); return vPerfil(true); }
+  await refreshRes();
+  chrome();
+  const h = location.hash || '#/';
+  try {
+    if (h === '#/') return await vCatalogo();
+    if (h === '#/carrito') return vCarrito();
+    if (h === '#/pedidos') return await vPedidos();
+    if (h.startsWith('#/pedido/')) return await vPedido(h.split('/')[2]);
+    if (h === '#/cuenta') return ME.rol === 'mayorista' ? await vPerfil(false) : vClave(false);
+    if (ME.rol === 'admin' && h === '#/usuarios') return await vUsuarios();
+    if (ME.rol === 'admin' && h === '#/productos') return await vProductos();
+    if (ME.rol === 'admin' && h === '#/sync') return await vSync();
+  } catch (e) { app.innerHTML = `<div class="msg e">${esc(e.message)}</div>`; return; }
+  app.innerHTML = '<div class="msg e">Página no encontrada</div>';
+}
+window.addEventListener('hashchange', render);
+$('#out').onclick = async () => { await api('POST', '/api/logout', {}).catch(() => {}); ME = null; go('#/'); render(); };
+
+/* ---- login ---- */
+function vLogin() {
+  $('#app').innerHTML = `<div class="card login"><h1>Ingresar</h1><p class="mut">Usa el correo y la clave que te entregó la empresa.</p>
+  <form id="f"><label>Correo</label><input name="email" type="email" autocomplete="username" required><label>Clave</label><input name="password" type="password" autocomplete="current-password" required>
+  <div id="m"></div><p><button style="width:100%">Entrar</button></p></form></div>`;
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault(); const f = e.target;
+    try { await api('POST', '/api/login', { email: f.email.value, password: f.password.value }); ME = null; go('#/'); render(); } catch (er) { $('#m').innerHTML = `<div class="msg e">${esc(er.message)}</div>`; }
+  };
+}
+
+/* ---- cambiar clave (obligatorio la primera vez) ---- */
+function vClave(primera) {
+  $('#app').innerHTML = `<div class="card login">${primera ? `<h1>Bienvenido/a, ${esc(ME.nombre)}</h1><p>Por seguridad, elige tu propia clave antes de seguir.${ME.rol === 'mayorista' ? ' Después te pediremos tus datos de facturación.' : ''}</p>` : '<h1>Cambiar mi clave</h1>'}
+  <form id="f"><label>${primera ? 'Clave que te entregamos' : 'Clave actual'}</label><input name="a" type="password" autocomplete="current-password" required>
+  <label>Clave nueva (mínimo 8 caracteres)</label><input name="n" type="password" autocomplete="new-password" minlength="8" required>
+  <label>Repite la clave nueva</label><input name="n2" type="password" autocomplete="new-password" required><div id="m"></div><p><button style="width:100%">Guardar clave</button></p></form></div>`;
+  $('#f').onsubmit = async (e) => {
+    e.preventDefault(); const f = e.target;
+    if (f.n.value !== f.n2.value) return ($('#m').innerHTML = '<div class="msg e">Las claves nuevas no coinciden</div>');
+    try { await api('POST', '/api/clave', { actual: f.a.value, nueva: f.n.value }); ME = null; if (primera) go('#/'); await render(); if (!primera) $('#app').insertAdjacentHTML('afterbegin', '<div class="msg o">Clave cambiada</div>'); } catch (er) { $('#m').innerHTML = `<div class="msg e">${esc(er.message)}</div>`; }
+  };
+}
+
+/* ---- datos del cliente (facturación, despacho) ---- */
+const rutFmt = (s) => { const c = String(s).replace(/[^0-9kK]/g, '').toUpperCase(); if (c.length < 2) return c; return c.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + c.slice(-1); };
+async function vPerfil(primera) {
+  const p = await api('GET', '/api/perfil'); const d = p.datos || {}; REG = p.regiones;
+  const fld = (k, lbl, extra = '') => `<div data-k="${k}"><label>${lbl}</label><input name="${k}" value="${esc(d[k] || '')}" ${extra}><div class="err"></div></div>`;
+  $('#app').innerHTML = `<h1>${primera ? 'Completa tus datos' : 'Mis datos'}</h1>
+  <div class="msg i">${primera ? 'Es solo la primera vez. Con esto armamos tus facturas y despachos; después puedes corregirlos cuando quieras.' : 'Puedes corregir cualquier dato. Los pedidos ya enviados conservan los datos que tenías en ese momento.'}</div>
+  <form id="f"><div class="card"><h2>Facturación</h2><div class="row c2">${fld('razon_social', 'Razón social')}${fld('rut', 'RUT de la empresa', 'placeholder="76.123.456-7"')}</div>
+  ${fld('giro', 'Giro')}${fld('direccion', 'Dirección (calle y número)')}
+  <div class="row c3">${fld('comuna', 'Comuna')}${fld('ciudad', 'Ciudad')}<div data-k="region"><label>Región</label><select name="region"><option value="">Elige…</option>${REG.map((r) => `<option ${d.region === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select><div class="err"></div></div></div>
+  ${fld('email_fact', 'Correo para enviar las facturas', 'type="email"')}</div>
+  <div class="card"><h2>Contacto</h2><div class="row c3">${fld('contacto_nombre', 'Nombre de quien hace los pedidos')}${fld('telefono', 'Teléfono fijo o de oficina', 'type="tel"')}${fld('whatsapp', 'Celular / WhatsApp', 'type="tel" placeholder="9 1234 5678"')}</div></div>
+  <div class="card"><h2>Despacho</h2><label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input type="checkbox" name="despacho_igual" style="width:auto" ${d.despacho_igual === false ? '' : 'checked'}> Despachar a la misma dirección de facturación</label>
+  <div id="desp" ${d.despacho_igual === false ? '' : 'hidden'}><div class="row c3">${fld('despacho_direccion', 'Dirección de despacho')}${fld('despacho_comuna', 'Comuna')}${fld('despacho_ciudad', 'Ciudad')}</div></div>
+  <label>Observaciones (horarios de recepción, etc.)</label><textarea name="obs" rows="2" maxlength="300">${esc(d.obs || '')}</textarea></div>
+  <div id="m"></div><button id="gb">${primera ? 'Guardar y entrar al catálogo' : 'Guardar cambios'}</button></form>`;
+  const f = $('#f');
+  f.despacho_igual.onchange = () => { $('#desp').hidden = f.despacho_igual.checked; };
+  f.rut.onblur = () => { f.rut.value = rutFmt(f.rut.value); };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const body = {}; for (const el of f.elements) if (el.name) body[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+    document.querySelectorAll('.bad').forEach((x) => { x.classList.remove('bad'); x.querySelector('.err').textContent = ''; });
+    try {
+      await api('PUT', '/api/perfil', body); ME = null; await render();
+      if (primera) go('#/'); else $('#app').insertAdjacentHTML('afterbegin', '<div class="msg o">Datos guardados</div>');
+    } catch (er) {
+      $('#m').innerHTML = `<div class="msg e">${esc(er.message)}</div>`;
+      Object.entries((er.data && er.data.campos) || {}).forEach(([k, v]) => { const w = $(`[data-k="${k}"]`); if (w) { w.classList.add('bad'); w.querySelector('.err').textContent = v; } });
+      const first = $('.bad'); if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  };
+}
+
+/* ---- catálogo ---- */
+const CAT = { q: '', cat: '', aro: '', pagina: 1 };
+async function vCatalogo() {
+  const app = $('#app');
+  if (!$('#cat-top')) app.innerHTML = `<div id="cat-top" class="card"><div class="row c3"><input id="q" type="search" placeholder="Buscar por medida (205 55 16), SKU o nombre" value="${esc(CAT.q)}"><select id="cat"></select><select id="aro"></select></div></div><div id="list"></div>`;
+  const qs = new URLSearchParams({ q: CAT.q, cat: CAT.cat, aro: CAT.aro, pagina: CAT.pagina });
+  const r = await api('GET', '/api/productos?' + qs);
+  if (!$('#list')) return; // cambió de pantalla mientras cargaba
+  const opt = (arr, v, all) => `<option value="">${all}</option>` + arr.map((x) => `<option ${x === v ? 'selected' : ''} value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('#cat').innerHTML = opt(r.categorias, CAT.cat, 'Todas las categorías'); $('#cat').hidden = !r.categorias.length;
+  $('#aro').innerHTML = opt(r.aros, CAT.aro, 'Todos los aros');
+  let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { CAT.q = e.target.value; CAT.pagina = 1; vCatalogo(); }, 350); };
+  $('#cat').onchange = (e) => { CAT.cat = e.target.value; CAT.pagina = 1; vCatalogo(); };
+  $('#aro').onchange = (e) => { CAT.aro = e.target.value; CAT.pagina = 1; vCatalogo(); };
+  const cart = cartGet(), buy = ME.rol === 'mayorista';
+  $('#list').innerHTML = (r.items.length ? `<div class="grid">${r.items.map((p) => {
+    const inCart = (cart[p.sku] || {}).qty || 0, left = Math.max(0, p.max - inCart);
+    return `<div class="prod"><div class="fotos">${p.fotos.length ? `<div class="sl">${p.fotos.map((u) => `<img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}">`).join('')}</div>${p.fotos.length > 1 ? `<div class="dots">${p.fotos.map((_, i) => `<s class="${i ? '' : 'on'}"></s>`).join('')}</div>` : ''}` : '<div class="nof">Sin foto</div>'}</div>
+    <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>
+    <span class="pr">${clp(p.precio)} <small>+ IVA c/u</small></span>
+    ${buy ? (left > 0 ? `<div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Disponible para pedir: ${p.max}</span>`}</div></div>`;
+  }).join('')}</div>` : '<div class="card mut">No encontramos productos con esos filtros.</div>') +
+    `<div class="pager"><button class="sec sm" id="pp" ${r.pagina <= 1 ? 'disabled' : ''}>← Anterior</button><span>Página ${r.pagina} de ${r.paginas} · ${r.total} productos</span><button class="sec sm" id="pn" ${r.pagina >= r.paginas ? 'disabled' : ''}>Siguiente →</button></div><div class="pad"></div>`;
+  $('#pp').onclick = () => { CAT.pagina--; vCatalogo(); scrollTo(0, 0); };
+  $('#pn').onclick = () => { CAT.pagina++; vCatalogo(); scrollTo(0, 0); };
+  document.querySelectorAll('.sl').forEach((sl) => sl.addEventListener('scroll', () => {
+    const i = Math.round(sl.scrollLeft / sl.clientWidth), dots = sl.parentNode.querySelectorAll('.dots s'); dots.forEach((d, k) => d.classList.toggle('on', k === i));
+  }, { passive: true }));
+  document.querySelectorAll('[data-add]').forEach((b) => (b.onclick = () => {
+    const input = b.parentNode.querySelector('input'), c = cartGet(), sku = b.dataset.add, max = Number(b.dataset.max);
+    let n = Math.floor(Number(input.value)); if (!(n >= 1)) n = 1;
+    const cur = (c[sku] || {}).qty || 0;
+    if (cur + n > max) { n = max - cur; alert('Solo puedes pedir hasta ' + max + ' unidades de este producto.'); }
+    if (n < 1) return;
+    c[sku] = { qty: cur + n, nombre: b.dataset.n, precio: Number(b.dataset.p), max }; cartSet(c); chrome(); vCatalogo();
+  }));
+}
+
+/* ---- carrito y envío del pedido ---- */
+function vCarrito() {
+  const c = cartGet(), skus = Object.keys(c);
+  if (!skus.length) { $('#app').innerHTML = '<h1>Mi pedido</h1><div class="card mut">Aún no agregas productos. <a href="#/">Ir al catálogo</a></div>'; return; }
+  const total = skus.reduce((s, k) => s + c[k].qty * c[k].precio, 0);
+  $('#app').innerHTML = `<h1>Mi pedido</h1><div class="card"><table><tr><th>SKU / Producto</th><th class="n">Cantidad</th><th class="n hide-s">Subtotal</th><th></th></tr>
+  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} + IVA c/u</span></td><td class="n"><input type="number" inputmode="numeric" min="1" max="${c[k].max}" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
+  <tr><td colspan="2" class="n"><b>Total referencial (+ IVA)</b></td><td class="n hide-s"><b>${clp(total)}</b></td><td></td></tr></table>
+  <p class="mut" style="font-size:14px">Es un pedido previo: tu vendedor ${ME.vendedor ? '<b>' + esc(ME.vendedor.nombre) + '</b> ' : ''}lo revisa y lo confirma. Precios y disponibilidad pueden variar hasta entonces.</p>
+  <label>Observaciones para tu vendedor (opcional)</label><textarea id="nt" rows="2" maxlength="500"></textarea><div id="m"></div>
+  <div class="flex" style="margin-top:12px"><button id="send">Enviar pedido</button><button class="sec" id="clr">Vaciar</button></div></div>`;
+  document.querySelectorAll('[data-q]').forEach((i) => (i.onchange = () => {
+    const k = i.dataset.q, n = Math.floor(Number(i.value)); if (n >= 1) c[k].qty = Math.min(n, c[k].max); cartSet(c); chrome(); vCarrito();
+  }));
+  document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { delete c[b.dataset.del]; cartSet(c); chrome(); vCarrito(); }));
+  $('#clr').onclick = () => { if (confirm('¿Vaciar el pedido?')) { cartSet({}); chrome(); vCarrito(); } };
+  $('#send').onclick = async () => {
+    const b = $('#send'); b.disabled = true;
+    try {
+      const r = await api('POST', '/api/pedidos', { items: skus.map((k) => ({ sku: k, qty: c[k].qty })), notas: $('#nt').value });
+      cartSet({}); chrome(); vEnviado(r);
+    } catch (e) {
+      b.disabled = false;
+      let t = esc(e.message);
+      if (e.data && e.data.problemas) {
+        t += '<ul>' + e.data.problemas.map((p) => `<li>${esc(p.nombre)}: ${p.max ? 'solo quedan ' + p.max : 'ya no está disponible'}</li>`).join('') + '</ul>';
+        e.data.problemas.forEach((p) => { if (p.max) c[p.sku].max = p.max, c[p.sku].qty = Math.min(c[p.sku].qty, p.max); else delete c[p.sku]; }); cartSet(c);
+      }
+      $('#m').innerHTML = `<div class="msg e">${t}</div>`;
+    }
+  };
+}
+function resumenHtml(o) {
+  const c = o.cliente || {};
+  return `<div class="card"><div class="flex"><h2 style="margin:0">Pedido ${esc(o.codigo)}</h2><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado] || o.estado)}</span><span class="mut right">${fdate(o.fecha)}</span></div>
+  <h2 style="margin-top:14px">Cliente</h2><div class="kv"><span>Razón social</span><span>${esc(c.razon_social)}</span><span>RUT</span><span>${esc(c.rut)}</span><span>Giro</span><span>${esc(c.giro)}</span>
+  <span>Facturación</span><span>${esc(c.direccion)}, ${esc(c.comuna)}, ${esc(c.ciudad)} (${esc(c.region)})</span><span>Despacho</span><span>${c.despacho_igual === false ? esc(c.despacho_direccion + ', ' + c.despacho_comuna + ', ' + (c.despacho_ciudad || '')) : 'Misma dirección'}</span>
+  <span>Contacto</span><span>${esc(c.contacto_nombre)} · ${esc(c.whatsapp)}${c.telefono ? ' · ' + esc(c.telefono) : ''}</span><span>Correo facturas</span><span>${esc(c.email_fact)}</span><span>Vendedor</span><span>${esc((o.vendedor || {}).nombre)}</span></div>
+  ${o.notas ? `<p><b>Observaciones:</b> ${esc(o.notas)}</p>` : ''}
+  <h2 style="margin-top:14px">Detalle</h2><table><tr><th>SKU</th><th>Producto</th><th class="n">Cant.</th><th class="n hide-s">Precio</th><th class="n hide-s">Subtotal</th></tr>
+  ${o.items.map((i) => `<tr><td>${esc(i.sku)}</td><td>${esc(i.name)}</td><td class="n">${i.qty}</td><td class="n hide-s">${clp(i.precio)}</td><td class="n hide-s">${clp(i.subtotal)}</td></tr>`).join('')}
+  <tr><td colspan="2"><b>${o.unidades} unidades</b></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total + IVA</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table></div>`;
+}
+function vEnviado(r) {
+  const wa = r.whatsapp;
+  $('#app').innerHTML = `<div class="msg o big">¡Pedido ${esc(r.pedido.codigo)} enviado!</div>
+  <div class="card"><p>Tu vendedor lo verá en su panel. Si quieres, avísale ahora mismo por WhatsApp para que lo atienda más rápido.</p>
+  <div class="flex">${wa ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(wa)}">Avisar por WhatsApp a mi vendedor</a>` : '<span class="mut">Tu vendedor no tiene WhatsApp registrado.</span>'}<a class="btn sec" href="#/pedidos">Ver mis pedidos</a><a class="btn sec" href="#/">Seguir comprando</a></div></div>${resumenHtml(r.pedido)}`;
+}
+
+/* ---- pedidos ---- */
+const PFILT = { estado: '' };
+async function vPedidos() {
+  const r = await api('GET', '/api/pedidos' + (PFILT.estado ? '?estado=' + PFILT.estado : ''));
+  const sel = `<select id="fe" style="width:auto"><option value="">Todos los estados</option>${Object.entries(ESTADO).map(([k, v]) => `<option value="${k}" ${PFILT.estado === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+  const seller = ME.rol !== 'mayorista';
+  $('#app').innerHTML = `<div class="flex"><h1 style="margin:6px 0">${seller ? 'Pedidos' : 'Mis pedidos'}</h1><span class="right">${sel}</span></div>` + (r.items.length ? `<div class="card"><table><tr><th>N°</th><th>Fecha</th>${seller ? '<th>Cliente</th>' : ''}${ME.rol === 'admin' ? '<th class="hide-s">Vendedor</th>' : ''}<th class="n">Unid.</th><th>Estado</th></tr>` +
+    r.items.map((o) => `<tr style="cursor:pointer" data-go="${o.id}"><td><a href="#/pedido/${o.id}">${esc(o.codigo)}</a></td><td>${fdate(o.fecha)}</td>${seller ? `<td>${esc((o.cliente || {}).razon_social)}</td>` : ''}${ME.rol === 'admin' ? `<td class="hide-s">${esc((o.vendedor || {}).nombre)}</td>` : ''}<td class="n">${o.unidades}</td><td><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado])}</span></td></tr>`).join('') + '</table></div>' : '<div class="card mut">No hay pedidos.</div>');
+  $('#fe').onchange = (e) => { PFILT.estado = e.target.value; vPedidos(); };
+  document.querySelectorAll('[data-go]').forEach((tr) => (tr.onclick = () => go('#/pedido/' + tr.dataset.go)));
+}
+async function vPedido(id) {
+  const r = await api('GET', '/api/pedidos/' + encodeURIComponent(id)), o = r.pedido, seller = ME.rol !== 'mayorista';
+  let acc = '';
+  if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>
+    <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p><div id="m"></div></div>`;
+  else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
+  $('#app').innerHTML = `<p><a href="#/pedidos">← Volver</a></p>${acc}${resumenHtml(o)}`;
+  const upd = async (body) => { try { await api('PATCH', '/api/pedidos/' + o.id, body); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
+  document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => upd({ estado: b.dataset.st })));
+  if ($('#sn')) $('#sn').onclick = () => upd({ notaInterna: $('#ni').value });
+  if ($('#cx')) $('#cx').onclick = async () => { if (!confirm('¿Cancelar este pedido?')) return; try { await api('POST', '/api/pedidos/' + o.id + '/cancelar', {}); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
+}
+
+/* ---- administración ---- */
+async function vUsuarios() {
+  const [u, v] = await Promise.all([api('GET', '/api/admin/usuarios'), api('GET', '/api/admin/vendedores')]);
+  const rol = { admin: 'Administrador', vendedor: 'Vendedor', mayorista: 'Mayorista' };
+  $('#app').innerHTML = `<h1>Usuarios</h1><div class="card"><h2>Crear usuario</h2><form id="f"><div class="row c3"><div><label>Tipo</label><select name="rol"><option value="mayorista">Mayorista (cliente)</option><option value="vendedor">Vendedor</option><option value="admin">Administrador</option></select></div>
+  <div><label>Nombre</label><input name="nombre" required></div><div><label>Correo (será su usuario)</label><input name="email" type="email" required></div></div>
+  <div class="row c2"><div id="vw"><label>Vendedor asignado</label><select name="vendedorId">${v.items.map((x) => `<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div><div><label>Celular (WhatsApp)</label><input name="telefono" placeholder="9 1234 5678"></div></div>
+  <div id="m"></div><p><button>Crear y generar clave</button></p></form></div>
+  <div class="card"><table><tr><th>Nombre</th><th>Tipo</th><th class="hide-s">Vendedor</th><th>Estado</th><th></th></tr>${u.items.map((x) => `<tr><td><b>${esc(x.nombre)}</b><br><span class="mut">${esc(x.email)}</span>${x.razonSocial ? '<br>' + esc(x.razonSocial) : ''}</td><td>${rol[x.rol]}</td>
+  <td class="hide-s">${x.rol === 'mayorista' ? `<select data-sv="${x.id}" style="width:auto">${v.items.map((s) => `<option value="${s.id}" ${s.id === x.vendedorId ? 'selected' : ''}>${esc(s.nombre)}</option>`).join('')}</select>` : ''}</td>
+  <td>${!x.activo ? '<span class="tag cancelado">Desactivado</span>' : x.cambiarClave ? '<span class="tag nuevo">Aún no entra</span>' : x.perfilCompleto === false ? '<span class="tag nuevo">Falta llenar datos</span>' : '<span class="tag confirmado">Activo</span>'}</td>
+  <td class="n"><button class="sec sm" data-rs="${x.id}">Nueva clave</button> <button class="sec sm" data-ac="${x.id}" data-v="${x.activo ? 0 : 1}">${x.activo ? 'Desactivar' : 'Activar'}</button></td></tr>`).join('')}</table></div>`;
+  const f = $('#f'), sync = () => { $('#vw').hidden = f.rol.value !== 'mayorista'; }; f.rol.onchange = sync; sync();
+  const showKey = (email, k) => { $('#app').insertAdjacentHTML('afterbegin', `<div class="card"><h2>Credenciales de ${esc(email)}</h2><div class="clave">${esc(k)}</div><p class="mut">Entrégasela por un medio privado. Se muestra solo ahora; en su primer ingreso tendrá que cambiarla${''}.</p></div>`); scrollTo(0, 0); };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    try { const r = await api('POST', '/api/admin/usuarios', { rol: f.rol.value, nombre: f.nombre.value, email: f.email.value, telefono: f.telefono.value, vendedorId: f.rol.value === 'mayorista' ? f.vendedorId.value : undefined }); const em = f.email.value; await vUsuarios(); showKey(em, r.claveTemporal); }
+    catch (er) { $('#m').innerHTML = `<div class="msg e">${esc(er.message)}</div>`; }
+  };
+  document.querySelectorAll('[data-rs]').forEach((b) => (b.onclick = async () => { if (!confirm('¿Generar una clave nueva? La anterior deja de servir.')) return; const r = await api('POST', `/api/admin/usuarios/${b.dataset.rs}/clave`, {}); const em = (u.items.find((x) => x.id == b.dataset.rs) || {}).email; await vUsuarios(); showKey(em, r.claveTemporal); }));
+  document.querySelectorAll('[data-ac]').forEach((b) => (b.onclick = async () => { try { await api('PATCH', '/api/admin/usuarios/' + b.dataset.ac, { activo: b.dataset.v === '1' }); vUsuarios(); } catch (e) { alert(e.message); } }));
+  document.querySelectorAll('[data-sv]').forEach((s) => (s.onchange = async () => { try { await api('PATCH', '/api/admin/usuarios/' + s.dataset.sv, { vendedorId: s.value }); } catch (e) { alert(e.message); } }));
+}
+let PQ = '';
+async function vProductos() {
+  const r = await api('GET', '/api/admin/productos?q=' + encodeURIComponent(PQ));
+  $('#app').innerHTML = `<h1>Productos</h1><div class="card"><input id="q" type="search" placeholder="Buscar SKU o nombre" value="${esc(PQ)}"><p class="mut">${r.total} productos${r.total > 200 ? ' (mostrando 200)' : ''}. El stock es la suma de Talca + Bodega Adicional según Bsale; "reservado" son pedidos nuevos o en revisión.</p>
+  <table><tr><th>SKU / Producto</th><th class="n">Precio</th><th class="n">Stock</th><th class="n hide-s">Reserv.</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
+  <td class="n"><button class="sec sm" data-h="${esc(p.sku)}" data-v="${p.oculto ? 0 : 1}">${p.oculto ? 'Mostrar' : 'Ocultar'}</button></td></tr>`).join('')}</table></div>`;
+  let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(async () => { PQ = e.target.value; await vProductos(); const i = $('#q'); i.focus(); i.setSelectionRange(PQ.length, PQ.length); }, 400); };
+  document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = async () => { await api('PATCH', '/api/admin/productos/' + encodeURIComponent(b.dataset.h), { oculto: b.dataset.v === '1' }); vProductos(); }));
+}
+async function vSync() {
+  const s = await api('GET', '/api/admin/sync'), l = s.ultima;
+  $('#app').innerHTML = `<h1>Bsale y fotos</h1><div class="card"><div class="kv"><span>Bsale</span><span>${s.bsale ? 'Conectado' : '<b style="color:var(--mal)">Falta BSALE_TOKEN</b>'}</span><span>Google Drive</span><span>${s.drive ? 'Conectado' : '<b style="color:var(--warn)">Sin configurar (productos sin fotos)</b>'}</span>
+  <span>Última sincronización</span><span>${l ? fdate(l.at) + (l.ok ? '' : ' — <b style="color:var(--mal)">falló: ' + esc(l.error) + '</b>') : 'Aún no se ha ejecutado'}</span>
+  ${l && l.ok ? `<span>Productos</span><span>${l.productos} en Bsale · ${l.conStock} visibles en el catálogo</span><span>Sucursales</span><span>${esc((l.sucursales || []).join(' + '))}</span>${l.fotos != null ? `<span>Fotos</span><span>${l.fotos} archivos vinculados</span>` : ''}` : ''}
+  ${l && (l.avisos || []).length ? `<span>Avisos</span><span>${l.avisos.map(esc).join('<br>')}</span>` : ''}</div>
+  <p class="mut">Se actualiza solo cada pocos minutos. Si cambiaste fotos en Drive, usa el botón para refrescarlas ahora.</p><button id="go" ${s.enCurso || !s.bsale ? 'disabled' : ''}>${s.enCurso ? 'Sincronizando…' : 'Sincronizar ahora'}</button></div>`;
+  $('#go').onclick = async () => { try { await api('POST', '/api/admin/sync', {}); } catch (e) { alert(e.message); } setTimeout(vSync, 1500); };
+  if (s.enCurso) setTimeout(() => { if ((location.hash || '') === '#/sync') vSync(); }, 3000);
+}
+render();
+</script>
+</body>
+</html>
