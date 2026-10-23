@@ -337,14 +337,28 @@ async function vProductos() {
   document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = async () => { await api('PATCH', '/api/admin/productos/' + encodeURIComponent(b.dataset.h), { oculto: b.dataset.v === '1' }); vProductos(); }));
 }
 async function vSync() {
-  const s = await api('GET', '/api/admin/sync'), l = s.ultima;
-  $('#app').innerHTML = `<h1>Bsale y fotos</h1><div class="card"><div class="kv"><span>Bsale</span><span>${s.bsale ? 'Conectado' : '<b style="color:var(--mal)">Falta BSALE_TOKEN</b>'}</span><span>Google Drive</span><span>${s.drive ? 'Conectado' : '<b style="color:var(--warn)">Sin configurar (productos sin fotos)</b>'}</span>
+  const [s, dr] = await Promise.all([api('GET', '/api/admin/sync'), api('GET', '/api/admin/drive')]), l = s.ultima;
+  const modo = { enlace: 'Carpeta pública (enlace)', cuenta: 'Cuenta de servicio de Google' }[dr.modo];
+  $('#app').innerHTML = `<h1>Bsale y fotos</h1><div class="card"><div class="kv"><span>Bsale</span><span>${s.bsale ? 'Conectado' : '<b style="color:var(--mal)">Falta BSALE_TOKEN</b>'}</span><span>Fotos (Drive)</span><span>${modo ? esc(modo) : '<b style="color:var(--warn)">Sin configurar (productos sin fotos)</b>'}</span>
   <span>Última sincronización</span><span>${l ? fdate(l.at) + (l.ok ? '' : ' — <b style="color:var(--mal)">falló: ' + esc(l.error) + '</b>') : 'Aún no se ha ejecutado'}</span>
   ${l && l.ok ? `<span>Productos</span><span>${l.productos} en Bsale · ${l.conStock} visibles en el catálogo</span><span>Sucursales</span><span>${esc((l.sucursales || []).join(' + '))}</span>${l.fotos != null ? `<span>Fotos</span><span>${l.fotos} archivos vinculados</span>` : ''}` : ''}
   ${l && (l.avisos || []).length ? `<span>Avisos</span><span>${l.avisos.map(esc).join('<br>')}</span>` : ''}</div>
-  <p class="mut">Se actualiza solo cada pocos minutos. Si cambiaste fotos en Drive, usa el botón para refrescarlas ahora.</p><button id="go" ${s.enCurso || !s.bsale ? 'disabled' : ''}>${s.enCurso ? 'Sincronizando…' : 'Sincronizar ahora'}</button></div>`;
+  <p class="mut">Se actualiza solo cada pocos minutos. Si cambiaste fotos en Drive, usa el botón para refrescarlas ahora.</p><button id="go" ${s.enCurso || !s.bsale ? 'disabled' : ''}>${s.enCurso ? 'Sincronizando…' : 'Sincronizar ahora'}</button></div>
+  <div class="card"><h2>Carpeta de fotos en Google Drive</h2>
+  <p class="mut" style="margin-top:0">Pega el enlace de la carpeta. En Drive debe estar compartida como <b>«Cualquier persona con el enlace» · Lector</b> (botón Compartir → Acceso general). Las fotos deben llamarse como el SKU (<b>SKU.jpg</b>, <b>SKU_1.jpg</b>, <b>SKU_2.jpg</b>…) o ir en subcarpetas con el nombre del SKU.</p>
+  <label>Enlace de la carpeta</label><input id="dl" type="url" placeholder="https://drive.google.com/drive/folders/…" value="${esc(dr.enlace)}">
+  <div id="dm"></div><div class="flex" style="margin-top:10px"><button id="ds">Guardar y buscar fotos</button>${dr.modo === 'enlace' ? '<button class="sec" id="dx">Quitar enlace</button>' : ''}</div></div>`;
   $('#go').onclick = async () => { try { await api('POST', '/api/admin/sync', {}); } catch (e) { alert(e.message); } setTimeout(vSync, 1500); };
-  if (s.enCurso) setTimeout(() => { if ((location.hash || '') === '#/sync') vSync(); }, 3000);
+  $('#ds').onclick = async () => {
+    const b = $('#ds'); b.disabled = true; $('#dm').innerHTML = '<div class="msg i">Revisando la carpeta…</div>';
+    try {
+      const r = await api('POST', '/api/admin/drive', { enlace: $('#dl').value });
+      $('#dm').innerHTML = `<div class="msg o">Listo: encontré fotos para <b>${r.productosConFoto}</b> de ${r.productosEnCatalogo} productos del catálogo. Se están vinculando ahora.</div>`;
+      setTimeout(() => { if (location.hash === '#/sync') vSync(); }, 4000);
+    } catch (e) { b.disabled = false; $('#dm').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; }
+  };
+  if ($('#dx')) $('#dx').onclick = async () => { try { await api('DELETE', '/api/admin/drive', {}); vSync(); } catch (e) { $('#dm').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
+  if (s.enCurso) setTimeout(() => { if (location.hash === '#/sync') vSync(); }, 3000);
 }
 render();
 </script>

@@ -90,7 +90,20 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
 
   const mem = newDb(); const { Pool } = mem.adapters.createPg(); const pool = new Pool();
   await db.init(pool);
-  const app = createApp(pool, { bsale, drive, cacheDir: path.join(os.tmpdir(), 'cat-test-' + process.pid) });
+  // Google simulado para la carpeta pública (vista incrustada de Drive y descarga por enlace)
+  const entry = (id, name, folder) => `<div class="flip-entry" id="entry-${id}" tabindex="0"><div class="flip-entry-info"><a href="https://drive.google.com/${folder ? 'drive/folders/' : 'file/d/'}${id}/${folder ? '' : 'view?usp=drive_web'}" target="_blank"><div class="flip-entry-title">${name}</div></a></div></div>`;
+  const pubFolders = {
+    PUBROOT0001: entry('pubfile0001', 'AB-205_1.jpg') + entry('pubfile0002', 'AB-205_2.JPG') + entry('pubfold0001', 'AB-265', true) + entry('pubfile0009', 'notas &amp; precios.txt'),
+    pubfold0001: entry('pubfile0003', 'b.jpg') + entry('pubfile0004', 'a.jpg'),
+    EMPTYROOT01: '<html><body>vacía</body></html>',
+  };
+  const publicFetch = async (url) => {
+    const u = String(url);
+    if (u.includes('embeddedfolderview')) { const id = decodeURIComponent(u.match(/id=([^&#]+)/)[1]); return pubFolders[id] ? { ok: true, status: 200, text: async () => '<html>' + pubFolders[id] + '</html>' } : { ok: false, status: 404, text: async () => '' }; }
+    if (u.startsWith('https://lh3.googleusercontent.com/d/')) return { ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9]) };
+    return { ok: false, status: 404, headers: { get: () => '' } };
+  };
+  const app = createApp(pool, { publicFetch, bsale, drive, cacheDir: path.join(os.tmpdir(), 'cat-test-' + process.pid) });
   const srv = http.createServer(app).listen(0); const base = 'http://127.0.0.1:' + srv.address().port;
   const call = client(base);
 
@@ -215,6 +228,25 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   // desactivar usuario
   await call(A, 'PATCH', '/api/admin/usuarios/' + (await pool.query("SELECT id FROM users WHERE email='m2@x.cl'")).rows[0].id, { activo: false });
   ok((await call(M2, 'GET', '/api/me')).s === 401, 'usuario desactivado pierde el acceso');
+
+  // ---- fotos desde un enlace de carpeta pública (sin cuenta de servicio) ----
+  ok((await call(A, 'GET', '/api/admin/drive')).j.modo === 'cuenta', 'al inicio las fotos vienen de la cuenta de servicio');
+  ok((await call(V1b, 'POST', '/api/admin/drive', { enlace: 'x' })).s === 403, 'solo el administrador cambia la carpeta de fotos');
+  ok((await call(A, 'POST', '/api/admin/drive', { enlace: 'hola' })).s === 400, 'enlace que no es de Drive: se rechaza');
+  const noPub = await call(A, 'POST', '/api/admin/drive', { enlace: 'https://drive.google.com/drive/folders/NOEXISTE1234567' });
+  ok(noPub.s === 400 && noPub.j.error.includes('Cualquier persona con el enlace'), 'carpeta no pública: explica cómo compartirla');
+  ok((await call(A, 'POST', '/api/admin/drive', { enlace: 'https://drive.google.com/drive/folders/EMPTYROOT01' })).s === 400, 'carpeta sin fotos: avisa');
+  const pl = await call(A, 'POST', '/api/admin/drive', { enlace: 'https://drive.google.com/drive/u/0/folders/PUBROOT0001?usp=sharing' });
+  ok(pl.s === 200 && pl.j.productosConFoto === 2, 'enlace público válido: encuentra las fotos por SKU (' + JSON.stringify(pl.j) + ')');
+  for (let i = 0; i < 40 && (await call(A, 'GET', '/api/admin/sync')).j.enCurso; i++) await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 300));
+  const pc = (await call(A, 'GET', '/api/admin/productos')).j.items;
+  ok(pc.find((p) => p.sku === 'AB-205').fotos === 2 && pc.find((p) => p.sku === 'AB-265').fotos === 2, 'tras sincronizar, los productos quedan con las fotos de esa carpeta');
+  const cp = (await call(M1, 'GET', '/api/productos?q=AB-205')).j.items[0];
+  const pfo = await call(M1, 'GET', cp.fotos[0]);
+  ok(cp.fotos.length === 2 && pfo.s === 200 && pfo.ct.includes('image/jpeg'), 'la foto se sirve desde la carpeta pública');
+  ok((await call(A, 'GET', '/api/admin/drive')).j.modo === 'enlace', 'queda guardado el modo «enlace»');
+  ok((await call(A, 'DELETE', '/api/admin/drive', {})).s === 200 && (await call(A, 'GET', '/api/admin/drive')).j.modo === 'cuenta', 'quitar el enlace vuelve a la cuenta de servicio');
 
   srv.close(); await pool.end();
   console.log(fails ? '\n' + fails + ' prueba(s) fallaron' : '\nTodo bien');

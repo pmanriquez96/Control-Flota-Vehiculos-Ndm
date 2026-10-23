@@ -5,8 +5,8 @@ const express = require('express');
 const db = require('./lib/db');
 const auth = require('./lib/auth');
 const { makeClient } = require('./lib/bsale');
-const { makeDrive, loadCredentials } = require('./lib/drive');
-const { runSync, getKv, state: syncState } = require('./lib/sync');
+const { makeDrive, makePublicDrive, parseFolderId, loadCredentials } = require('./lib/drive');
+const { runSync, getKv, setKv, state: syncState } = require('./lib/sync');
 const { cleanProfile, REGIONES } = require('./lib/profile');
 const { emailOk, waNumber, matches, clp } = require('./lib/util');
 
@@ -24,7 +24,9 @@ function createApp(pool, opts = {}) {
   const empresa = process.env.EMPRESA || 'Repuestos del Maule';
   const cacheDir = path.resolve(opts.cacheDir || process.env.CACHE_DIR || './cache');
   const q = (t, p) => pool.query(t, p);
-  let drive = opts.drive || null;
+  const envDrive = opts.drive || null; // cuenta de servicio (variables de entorno)
+  let drive = envDrive;
+  let driveLink = ''; // carpeta pública pegada por el administrador (tiene prioridad)
   let bsale = opts.bsale || null;
   let orderLock = Promise.resolve(); // un pedido a la vez (evita pasarse del stock)
 
@@ -375,7 +377,7 @@ function createApp(pool, opts = {}) {
 
   async function doSync(forcePhotos) { return runSync(pool, { bsale, drive, forcePhotos }); }
   app.get('/api/admin/sync', ...admin, wrap(async (req, res) => {
-    res.json({ enCurso: syncState.running, ultima: syncState.last || await getKv(pool, 'lastSync'), bsale: !!bsale, drive: !!drive });
+    res.json({ enCurso: syncState.running, ultima: syncState.last || await getKv(pool, 'lastSync'), bsale: !!bsale, drive: !!drive, driveModo: driveLink ? 'enlace' : envDrive ? 'cuenta' : null });
   }));
   app.post('/api/admin/sync', ...admin, wrap(async (req, res) => {
     if (!bsale) return res.status(409).json({ error: 'Falta configurar BSALE_TOKEN' });
@@ -383,6 +385,38 @@ function createApp(pool, opts = {}) {
     doSync(true).catch((e) => console.error('sync', e));
     res.json({ ok: true });
   }));
+
+  // Fotos desde un enlace de carpeta de Drive (carpeta compartida como «Cualquier persona con el enlace»)
+  const publicDrive = (id) => makePublicDrive({ folderId: id, fetchImpl: opts.publicFetch });
+  app.get('/api/admin/drive', ...admin, wrap(async (req, res) => {
+    res.json({ modo: driveLink ? 'enlace' : envDrive ? 'cuenta' : null, enlace: driveLink });
+  }));
+  app.post('/api/admin/drive', ...admin, wrap(async (req, res) => {
+    const link = String((req.body || {}).enlace || '').trim();
+    const id = parseFolderId(link);
+    if (!id) return res.status(400).json({ error: 'Pega el enlace de la carpeta de Drive (termina en /folders/…)' });
+    const pd = publicDrive(id);
+    let idx;
+    try { idx = await pd.buildIndex(); } catch (e) { return res.status(400).json({ error: 'No pude abrir la carpeta. En Drive, botón Compartir → «Acceso general» → «Cualquier persona con el enlace» → Lector. (' + e.message + ')' }); }
+    if (!idx.size) return res.status(400).json({ error: 'Abrí la carpeta pero no encontré fotos. Deben llamarse como el SKU (SKU.jpg, SKU_1.jpg…) o estar en subcarpetas con el nombre del SKU.' });
+    const skus = new Set((await q('SELECT sku FROM products')).rows.map((r) => r.sku));
+    const conFoto = [...idx.keys()].filter((k) => skus.has(k)).length;
+    await setKv(pool, 'driveLink', { link, id });
+    driveLink = link; drive = pd;
+    doSync(true).catch((e) => console.error('sync', e));
+    res.json({ ok: true, grupos: idx.size, productosConFoto: conFoto, productosEnCatalogo: skus.size });
+  }));
+  app.delete('/api/admin/drive', ...admin, wrap(async (req, res) => {
+    await pool.query('DELETE FROM kv WHERE k=$1', ['driveLink']);
+    driveLink = ''; drive = envDrive;
+    doSync(true).catch((e) => console.error('sync', e));
+    res.json({ ok: true });
+  }));
+  // Al iniciar: recupera el enlace guardado
+  app.init = async () => {
+    const saved = await getKv(pool, 'driveLink');
+    if (saved && saved.id) { driveLink = saved.link; drive = publicDrive(saved.id); }
+  };
 
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
   app.use(express.static(path.join(__dirname, 'public'), { index: false, maxAge: 0 }));
@@ -427,6 +461,7 @@ if (require.main === module) {
     await db.init(pool);
     await bootstrapAdmin(pool);
     const app = createApp(pool, sourcesFromEnv());
+    await app.init();
     const port = process.env.PORT || 3000;
     app.listen(port, () => console.log('Catálogo mayorista en el puerto ' + port));
     const mins = Math.max(5, Number(process.env.SYNC_MINUTES) || 15);

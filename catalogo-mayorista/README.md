@@ -26,6 +26,11 @@ Ver `.env.example`. Obligatorias en producción: `DATABASE_URL`, `SESSION_SECRET
 - El SKU es el **código de la variante** en Bsale.
 
 ### Google Drive
+Hay dos formas de conectar las fotos; si ambas están, **gana el enlace**.
+
+**A. Pegar el enlace de la carpeta (la más simple).** En la pantalla de administrador «Bsale y fotos» se pega el enlace de la carpeta y se presiona «Guardar y buscar fotos». La carpeta debe estar compartida como **«Cualquier persona con el enlace» · Lector** (quien tenga el enlace podría ver las fotos). No requiere Google Cloud ni variables de entorno. Se lee la vista pública de la carpeta que usa Drive para incrustarla y las fotos se bajan por su enlace público; es una vía no oficial, así que si Google cambia esa vista habrá que ajustarla. Para algo más robusto y privado, usar la opción B.
+
+**B. Cuenta de servicio (privada y oficial).**
 1. En Google Cloud crea una *cuenta de servicio*, habilita la API de Drive y descarga su clave JSON.
 2. Comparte la carpeta de fotos con el correo de esa cuenta (lector).
 3. `DRIVE_FOLDER_ID` = id de la carpeta (lo que va después de `/folders/` en la URL). `GOOGLE_SERVICE_ACCOUNT_JSON` = el JSON (o en base64).

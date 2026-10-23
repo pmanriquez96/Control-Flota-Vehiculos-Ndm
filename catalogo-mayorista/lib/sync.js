@@ -75,4 +75,4 @@ async function runSync(pool, { bsale, drive, forcePhotos }) {
   return res;
 }
 
-module.exports = { runSync, getKv, state };
+module.exports = { runSync, getKv, setKv, state };
