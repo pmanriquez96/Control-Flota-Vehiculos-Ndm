@@ -147,4 +147,29 @@ async function fetchCatalog(client, opts) {
   return { items, offices: chosen.map((o) => o.name), mainOffice: main.name, priceListId: plId };
 }
 
-module.exports = { makeClient, fetchCatalog, pickOffices, parseRin, norm };
+/* Stock actualizado solo de algunas variantes (por ejemplo, las de un pedido), sin esperar la sincronización completa.
+   Devuelve Map<variantId, {talca, bodega, total}> con las mismas reglas que fetchCatalog. */
+async function fetchStockFor(client, opts, variantIds) {
+  const offices = await client.all('/offices.json');
+  const chosen = pickOffices(offices, opts.offices);
+  if (!chosen.length) throw new Error('No encontré las sucursales en Bsale');
+  const main = pickOffices(chosen, [opts.mainOffice || opts.offices[0]])[0] || chosen[0];
+  const out = new Map(variantIds.map((v) => [v, { talca: 0, bodega: 0, raw: 0 }]));
+  for (const vid of variantIds) {
+    for (const o of chosen) {
+      const rows = await client.all('/stocks.json?variantid=' + vid + '&officeid=' + o.id);
+      for (const s of rows) {
+        if (s.variant && s.variant.id && s.variant.id !== vid) continue;
+        const q = Number(s.quantityAvailable != null ? s.quantityAvailable : s.quantity) || 0;
+        const r = out.get(vid);
+        r.raw += q;
+        if (o.id === main.id) r.talca += q; else r.bodega += q;
+      }
+    }
+  }
+  const res = new Map();
+  for (const [vid, r] of out) res.set(vid, { talca: Math.max(0, Math.floor(r.talca)), bodega: Math.max(0, Math.floor(r.bodega)), total: Math.max(0, Math.floor(r.raw)) });
+  return res;
+}
+
+module.exports = { makeClient, fetchCatalog, fetchStockFor, pickOffices, parseRin, norm };

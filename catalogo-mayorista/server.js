@@ -4,7 +4,7 @@ const fs = require('fs');
 const express = require('express');
 const db = require('./lib/db');
 const auth = require('./lib/auth');
-const { makeClient } = require('./lib/bsale');
+const { makeClient, fetchStockFor } = require('./lib/bsale');
 const { makeDrive, makePublicDrive, parseFolderId, loadCredentials } = require('./lib/drive');
 const { runSync, getKv, setKv, state: syncState } = require('./lib/sync');
 const { cleanProfile, REGIONES } = require('./lib/profile');
@@ -435,6 +435,33 @@ function createApp(pool, opts = {}) {
     const r = await q('UPDATE products SET hidden=$1 WHERE sku=$2', [!!(req.body || {}).oculto, String(req.params.sku).toUpperCase()]);
     if (!r.rowCount) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json({ ok: true });
+  }));
+
+  // Actualiza el stock ahora (por ejemplo, después de un traslado): de algunos SKU al tiro, o todo el catálogo en segundo plano.
+  const lastRefresh = new Map();
+  app.post('/api/stock/actualizar', loadUser, gate, only('admin', 'vendedor'), wrap(async (req, res) => {
+    if (!bsale) return res.status(409).json({ error: 'Falta configurar BSALE_TOKEN' });
+    const last = lastRefresh.get(req.user.id) || 0;
+    if (Date.now() - last < 3000) return res.status(429).json({ error: 'Espera unos segundos antes de volver a actualizar' });
+    lastRefresh.set(req.user.id, Date.now());
+    const skus = [...new Set((Array.isArray((req.body || {}).skus) ? req.body.skus : []).map((s) => String(s).toUpperCase()))];
+    if (!skus.length || skus.length > 30) {
+      if (syncState.running) return res.json({ ok: true, completo: true, enCurso: true });
+      doSync(false).catch((e) => console.error('sync', e));
+      return res.json({ ok: true, completo: true });
+    }
+    const rows = (await q(`SELECT sku,variant_id FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows.filter((r) => r.variant_id);
+    try {
+      const st = await fetchStockFor(bsale.client, bsale.opts, rows.map((r) => r.variant_id));
+      for (const r of rows) {
+        const s = st.get(r.variant_id);
+        await q('UPDATE products SET stock=$1, stock_talca=$2, stock_bodega=$3 WHERE sku=$4', [s.total, s.talca, s.bodega, r.sku]);
+      }
+      res.json({ ok: true, actualizados: rows.length });
+    } catch (e) {
+      console.error('Actualizar stock', e.message);
+      res.status(502).json({ error: 'No pude consultar Bsale: ' + e.message });
+    }
   }));
 
   async function doSync(forcePhotos) { return runSync(pool, { bsale, drive, forcePhotos }); }

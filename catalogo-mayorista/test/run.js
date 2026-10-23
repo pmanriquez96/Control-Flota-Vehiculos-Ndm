@@ -27,7 +27,7 @@ function fakeBsale(url) {
   const stocks = (m, oid) => Object.entries(m).map(([v, q]) => ({ quantity: q, quantityAvailable: q, variant: { id: Number(v) }, office: { id: oid } }));
   const body = (() => {
     if (p === '/offices.json') return page([{ id: 1, name: 'Talca' }, { id: 2, name: 'Bodega Adicional' }, { id: 3, name: 'Casa Matriz' }, { id: 4, name: 'Talca Centro' }, { id: 5, name: 'Bodega Adicional Norte' }], url); // los dos últimos NO deben contarse
-    if (p === '/stocks.json') { const o = new URL(url).searchParams.get('officeid'); return page(o === '1' ? stocks(state.talca, 1) : o === '2' ? stocks(state.bodega, 2) : stocks({ 1: 999 }, 3), url); }
+    if (p === '/stocks.json') { const sp = new URL(url).searchParams, o = sp.get('officeid'), vf = sp.get('variantid'); const all = o === '1' ? stocks(state.talca, 1) : o === '2' ? stocks(state.bodega, 2) : stocks({ 1: 999 }, 3); return page(vf ? all.filter((x) => x.variant.id === Number(vf)) : all, url); }
     if (p === '/price_lists.json') return page([{ id: 7, name: 'Minorista', state: 0 }, { id: 9, name: 'Lista Mayorista', state: 0 }], url);
     if (p === '/price_lists/9/details.json') return page([
       { variant: { id: 1 }, variantValue: 50000, variantValueWithTaxes: 59500 },
@@ -275,6 +275,21 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   state.talca[3] = 3; await app.doSync(false);
   const resTr = (await call(A, 'GET', '/api/admin/traslados')).j;
   ok(resTr.minimo === 1 && resTr.resumen.juegos === resTr.items.reduce((n, i) => n + i.mover, 0), 'resumen de traslados coherente');
+
+  // ---- después de un traslado: el stock nuevo se reconoce y el pedido se corrige ----
+  state.talca[3] = 0; state.bodega[3] = 3; await app.doSync(false);
+  const antes = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado;
+  ok(antes.total === 3 && antes.lineas[0].talca === 0, 'antes del traslado el pedido pide trasladar 3');
+  state.talca[3] = 3; state.bodega[3] = 0; // se hizo el traslado en Bsale (la plataforma aún no lo sabe)
+  ok((await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado.total === 3, 'mientras no se actualice, sigue mostrando el stock anterior');
+  ok((await call(M1, 'POST', '/api/stock/actualizar', { skus: ['AB-AGOTADO'] })).s === 403, 'el cliente no puede forzar la actualización de stock');
+  const rf = await call(V1b, 'POST', '/api/stock/actualizar', { skus: ['ab-agotado', 'NO-EXISTE'] });
+  ok(rf.s === 200 && rf.j.actualizados === 1, 'el vendedor actualiza el stock de los SKU del pedido sin esperar la sincronización');
+  const desp = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado;
+  ok(desp.total === 0 && desp.faltante === 0 && desp.faltanteReserva === 0 && desp.lineas[0].talca === 3 && desp.lineas[0].bodega === 0, 'con el stock nuevo en Talca, el pedido ya no pide traslado: la cantidad necesaria está disponible');
+  ok((await call(V1b, 'POST', '/api/stock/actualizar', { skus: ['AB-AGOTADO'] })).s === 429, 'no se puede actualizar de nuevo a cada segundo');
+  const ap3 = (await call(A, 'GET', '/api/admin/productos')).j.items.find((p) => p.sku === 'AB-AGOTADO');
+  ok(ap3.stock === 3 && ap3.talca === 3 && ap3.bodega === 0, 'un traslado no cambia el total entre ambas sucursales (sigue siendo 3), solo su ubicación');
 
   // ---- fotos desde un enlace de carpeta pública (sin cuenta de servicio) ----
   ok((await call(A, 'GET', '/api/admin/drive')).j.modo === 'cuenta', 'al inicio las fotos vienen de la cuenta de servicio');
