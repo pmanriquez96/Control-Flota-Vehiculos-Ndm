@@ -14,9 +14,10 @@ const ROLES = ['admin', 'vendedor', 'mayorista'];
 const ESTADOS = ['nuevo', 'revision', 'confirmado', 'rechazado', 'cancelado'];
 const PENDIENTES = ['nuevo', 'revision']; // pedidos que "reservan" stock
 const MAX_LINEAS = 100, MAX_QTY = 9999;
-// Se vende por juego (4 llantas por defecto). El precio de Bsale es por unidad; aquí se muestra por juego, con IVA incluido.
+// En Bsale cada variante ya es un juego (4 llantas): su precio es por juego y su stock está en juegos.
+// JUEGO_UNIDADES solo sirve para mostrar cuántas llantas trae el pedido.
 const JUEGO = Math.max(1, parseInt(process.env.JUEGO_UNIDADES, 10) || 4);
-const precioJuego = (unit) => Math.round(unit * JUEGO);
+const precioJuego = (p) => Math.round(p);
 
 function createApp(pool, opts = {}) {
   const app = express();
@@ -114,7 +115,7 @@ function createApp(pool, opts = {}) {
   async function reservedMap() {
     const r = await q(`SELECT i.sku, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id=i.order_id
                        WHERE o.estado IN ('nuevo','revision') GROUP BY i.sku`);
-    return new Map(r.rows.map((x) => [x.sku, Number(x.n) * JUEGO])); // unidades apartadas (los pedidos guardan juegos)
+    return new Map(r.rows.map((x) => [x.sku, Number(x.n)])); // juegos apartados por pedidos nuevos o en revisión
   }
   // El stock real nunca sale del servidor: solo "max", el tope que se puede pedir.
   // Orden: por diámetro de aro (el catálogo se muestra separado por aro) y luego por nombre.
@@ -124,7 +125,7 @@ function createApp(pool, opts = {}) {
       q('SELECT sku,name,category,medida,aro,ancho,pcd,et,price,stock FROM products WHERE hidden=false AND stock>0 AND price>0'),
       reservedMap(),
     ]);
-    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, Math.floor((p.stock - (res.get(p.sku) || 0)) / JUEGO)) })).filter((p) => p.max > 0)
+    return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, p.stock - (res.get(p.sku) || 0)) })).filter((p) => p.max > 0)
       .sort((a, b) => aroNum(a) - aroNum(b) || a.name.localeCompare(b.name, 'es', { numeric: true }));
   }
   app.get('/api/productos', loadUser, gate, wrap(async (req, res) => {
@@ -142,7 +143,7 @@ function createApp(pool, opts = {}) {
     const ph = slice.length ? (await q(`SELECT sku,file_id FROM photos WHERE sku IN (${slice.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY sku,pos`, slice.map((p) => p.sku))).rows : [];
     const items = slice.map((p) => ({
       sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, aro: p.aro, ancho: p.ancho, pcd: p.pcd, et: p.et,
-      precio: precioJuego(p.price), precioUnidad: Math.round(p.price), max: p.max,
+      precio: precioJuego(p.price), max: p.max,
       fotos: ph.filter((x) => x.sku === p.sku).map((x) => '/api/foto/' + x.file_id),
     }));
     res.json({ items, total: list.length, pagina: page, paginas: Math.max(1, Math.ceil(list.length / per)), categorias: cats, pcds, aros });
@@ -230,7 +231,7 @@ function createApp(pool, opts = {}) {
       const problemas = [];
       for (const sku of skus) {
         const p = prods.find((x) => x.sku === sku);
-        const max = p && !p.hidden && p.price > 0 ? Math.floor((p.stock - (resv.get(sku) || 0)) / JUEGO) : 0;
+        const max = p && !p.hidden && p.price > 0 ? p.stock - (resv.get(sku) || 0) : 0;
         if (!p || max <= 0) problemas.push({ sku, nombre: p ? p.name : sku, max: 0 });
         else if (want.get(sku) > max) problemas.push({ sku, nombre: p.name, max });
       }

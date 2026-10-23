@@ -21,7 +21,7 @@ const page = (all, url) => {
   const items = all.slice(off, off + lim);
   return { count: all.length, limit: lim, offset: off, items, next: off + lim < all.length ? 'x' : undefined };
 };
-const state = { talca: { 1: 20, 2: 8, 3: 0, 5: 0 }, bodega: { 1: 8, 2: 0, 3: 0, 4: 7, 5: 0 } }; // en unidades; se vende por juego de 4 // 4: sin precio
+const state = { talca: { 1: 5, 2: 2, 3: 0, 5: 0 }, bodega: { 1: 2, 2: 0, 3: 0, 4: 7, 5: 0 } }; // en juegos: cada variante de Bsale ya es el juego x4 // 4: sin precio
 function fakeBsale(url) {
   const p = new URL(url).pathname.replace('/v1', '');
   const stocks = (m, oid) => Object.entries(m).map(([v, q]) => ({ quantity: q, quantityAvailable: q, variant: { id: Number(v) }, office: { id: oid } }));
@@ -105,7 +105,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const sy = await app.doSync(true);
   ok(sy.ok && sy.productos === 5 && sy.conStock === 2 && sy.sucursales.length === 2 && sy.fotos === 4, 'sync: 5 productos, 2 visibles, 2 sucursales, 4 fotos ' + JSON.stringify(sy));
   const ap = (await call(A, 'GET', '/api/admin/productos')).j.items;
-  ok(ap.find((p) => p.sku === 'AB-205').stock === 28 && ap.find((p) => p.sku === 'AB-265').stock === 8, 'stock = Talca + Bodega Adicional (20+8, 8+0); Casa Matriz no cuenta');
+  ok(ap.find((p) => p.sku === 'AB-205').stock === 7 && ap.find((p) => p.sku === 'AB-265').stock === 2, 'stock = Talca + Bodega Adicional (5+2, 2+0); Casa Matriz no cuenta');
   ok(ap.find((p) => p.sku === 'AB-265').nombre === 'LLANTA ACERO 17X7.5 6X139.7 ET25' && ap.find((p) => p.sku === 'AB-265').medida === '17x7.5 · 6x139.7 · ET25', 'nombre = producto + variante, con su medida');
 
   // usuarios
@@ -145,7 +145,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const cat = (await call(M1, 'GET', '/api/productos')).j;
   ok(cat.total === 2 && cat.items.every((p) => p.sku !== 'AB-AGOTADO' && p.sku !== 'AB-SINPRECIO'), 'catálogo: solo con stock y precio');
   const p205 = cat.items.find((p) => p.sku === 'AB-205');
-  ok(p205.precio === 238000 && p205.precioUnidad === 59500 && p205.max === 7 && p205.fotos.length === 3 && !('stock' in p205), 'precio por juego con IVA (4 x 59.500), tope = 28 unidades / 4 = 7 juegos, 3 fotos y sin campo stock');
+  ok(p205.precio === 59500 && p205.max === 7 && p205.fotos.length === 3 && !('stock' in p205), 'precio del juego con IVA tal como viene de Bsale, tope = 7 juegos, 3 fotos y sin campo stock');
   ok(!JSON.stringify(cat).includes('"stock"'), 'la respuesta pública no trae stock');
   ok(cat.items.map((p) => p.aro).join() === '16,17' && cat.aros.map((a) => a.aro + ':' + a.n).join() === '16:1,17:1', 'catálogo separado y ordenado por aro (16, 17) con conteo');
   ok(p205.aro === '16' && p205.ancho === '7' && p205.pcd === '5x114.3' && p205.et === '40', 'ficha con aro, ancho, PCD y ET');
@@ -165,7 +165,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok((await ped([{ sku: 'AB-AGOTADO', qty: 1 }])).s === 409 && (await ped([{ sku: 'AB-SINPRECIO', qty: 1 }])).s === 409, 'ni productos agotados o sin precio');
   const o1 = await ped([{ sku: 'ab-205', qty: 4 }, { sku: 'AB-205', qty: 1 }, { sku: 'AB-265', qty: 2 }], 'Despachar mañana');
   ok(o1.s === 200 && o1.j.pedido.codigo === 'P-00001' && o1.j.pedido.items.length === 2 && o1.j.pedido.juegos === 7 && o1.j.pedido.unidades === 28, 'crea el pedido (junta líneas repetidas)');
-  ok(o1.j.pedido.cliente.razon_social === 'Neumáticos Sur SpA' && o1.j.pedido.total === 5 * 238000 + 2 * 380800, 'resumen con datos del cliente y total');
+  ok(o1.j.pedido.cliente.razon_social === 'Neumáticos Sur SpA' && o1.j.pedido.total === 5 * 59500 + 2 * 95200, 'resumen con datos del cliente y total');
   ok(o1.j.whatsapp.startsWith('https://wa.me/56987654321?text=') && decodeURIComponent(o1.j.whatsapp).includes('AB-205 — LLANTA ALEACION 16X7 5X114.3 ET40 NEGRO × 5 juegos'), 'enlace de WhatsApp al vendedor con el resumen');
   const cat2 = (await call(M1, 'GET', '/api/productos')).j;
   ok(cat2.items.length === 1 && cat2.items[0].max === 2, 'el pedido reserva stock (agotó AB-265, quedan 2 juegos de AB-205)');
