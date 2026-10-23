@@ -41,6 +41,8 @@ button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
 .chip{background:var(--soft);color:var(--az);padding:7px 13px;border-radius:20px;white-space:nowrap;font-size:15px}.chip i{font-style:normal;opacity:.7;font-size:12px;margin-left:3px}.chip.on{background:var(--az);color:#fff}
 .aro-h{font-size:19px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--az2);color:var(--az);display:flex;align-items:baseline;gap:10px}.aro-h small{font-size:13px;color:var(--mut);font-weight:400}
+.stk{display:flex;gap:6px;flex-wrap:wrap}.stk em{font-style:normal;font-size:13px;border-radius:6px;padding:3px 8px;background:var(--soft);color:var(--azd)}.stk em.z{background:#fff2d6;color:#8a5a00}.stk em b{font-weight:700}
+.tag.tras{background:#fff2d6;color:#8a5a00;margin-left:6px}.tag.falta{background:#fde5e2;color:#9b2a1e;margin-left:6px}
 .specs{display:flex;gap:5px;flex-wrap:wrap}.specs em{font-style:normal;font-size:12px;background:var(--soft);color:var(--azd);border-radius:6px;padding:2px 7px}
 .qty{display:flex;gap:6px;margin-top:auto}.qty input{width:70px;text-align:center}.qty button{flex:1}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:13px;color:var(--mut)}td.n,th.n{text-align:right;white-space:nowrap}
@@ -94,7 +96,7 @@ function chrome() {
   const t = [['#/', 'Catálogo']];
   if (ME.rol === 'mayorista') t.push(['#/carrito', 'Mi pedido' + (cartCount() ? ' <i>' + cartCount() + '</i>' : '')], ['#/pedidos', 'Mis pedidos'], ['#/cuenta', 'Mis datos']);
   else t.push(['#/pedidos', 'Pedidos' + ((RES.nuevo || 0) ? ' <i>' + RES.nuevo + '</i>' : '')], ['#/cuenta', 'Mi clave']);
-  if (ME.rol === 'admin') t.push(['#/usuarios', 'Usuarios'], ['#/productos', 'Productos'], ['#/sync', 'Bsale y fotos']);
+  if (ME.rol === 'admin') t.push(['#/traslados', 'Traslados'], ['#/usuarios', 'Usuarios'], ['#/productos', 'Productos'], ['#/sync', 'Bsale y fotos']);
   nav.innerHTML = t.map(([href, n]) => `<a href="${href}" class="${h === href || (href !== '#/' && h.startsWith(href + '/')) ? 'on' : ''}">${n}</a>`).join('');
   const n = cartCount();
   $('#bar').innerHTML = ME.rol === 'mayorista' && n && h !== '#/carrito' && !h.startsWith('#/pedido') ? `<div class="cartbar"><b>${n} juego${n > 1 ? 's' : ''} en tu pedido</b><a href="#/carrito">Ver pedido</a></div>` : '';
@@ -118,6 +120,7 @@ async function render() {
     if (h.startsWith('#/pedido/')) return await vPedido(h.split('/')[2]);
     if (h === '#/cuenta') return ME.rol === 'mayorista' ? await vPerfil(false) : vClave(false);
     if (ME.rol === 'admin' && h === '#/usuarios') return await vUsuarios();
+    if (ME.rol === 'admin' && h === '#/traslados') return await vTraslados();
     if (ME.rol === 'admin' && h === '#/productos') return await vProductos();
     if (ME.rol === 'admin' && h === '#/sync') return await vSync();
   } catch (e) { app.innerHTML = `<div class="msg e">${esc(e.message)}</div>`; return; }
@@ -209,7 +212,7 @@ async function vCatalogo() {
     return `<div class="prod"><div class="fotos">${p.fotos.length ? p.fotos.map((u) => `<div class="ph"><img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}"></div>`).join('') : '<div class="nof">Sin foto</div>'}</div>
     <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>${specs.length ? `<span class="specs">${specs.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` : ''}
     <span class="pr">${clp(p.precio)} <small>IVA incluido · juego de ${ME.juego}</small></span>
-    ${buy ? (left > 0 ? `<span class="mut" style="font-size:12px;margin-top:6px">Cantidad de juegos (hasta ${left})</span><div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad de juegos" title="Cantidad de juegos"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} juego${inCart > 1 ? 's' : ''} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Juegos disponibles para pedir: ${p.max}</span>`}</div></div>`;
+    ${buy ? (left > 0 ? `<span class="mut" style="font-size:12px;margin-top:6px">Cantidad de juegos (hasta ${left})</span><div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad de juegos" title="Cantidad de juegos"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} juego${inCart > 1 ? 's' : ''} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="stk"><em class="${p.stockTalca ? '' : 'z'}">Talca: <b>${p.stockTalca}</b></em><em>Bodega Adicional: <b>${p.stockBodega}</b></em></span><span class="mut" style="font-size:13px">Disponible para pedir: ${p.max} juego${p.max > 1 ? 's' : ''}</span>`}</div></div>`;
   };
   // Separado por diámetro de aro: un encabezado por cada aro
   const groups = []; r.items.forEach((p) => { let g = groups[groups.length - 1]; if (!g || g.aro !== p.aro) { g = { aro: p.aro, items: [] }; groups.push(g); } g.items.push(p); });
@@ -287,9 +290,17 @@ async function vPedidos() {
   const sel = `<select id="fe" style="width:auto"><option value="">Todos los estados</option>${Object.entries(ESTADO).map(([k, v]) => `<option value="${k}" ${PFILT.estado === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   const seller = ME.rol !== 'mayorista';
   $('#app').innerHTML = `<div class="flex"><h1 style="margin:6px 0">${seller ? 'Pedidos' : 'Mis pedidos'}</h1><span class="right">${sel}</span></div>` + (r.items.length ? `<div class="card"><table><tr><th>N°</th><th>Fecha</th>${seller ? '<th>Cliente</th>' : ''}${ME.rol === 'admin' ? '<th class="hide-s">Vendedor</th>' : ''}<th class="n">Juegos</th><th>Estado</th></tr>` +
-    r.items.map((o) => `<tr style="cursor:pointer" data-go="${o.id}"><td><a href="#/pedido/${o.id}">${esc(o.codigo)}</a></td><td>${fdate(o.fecha)}</td>${seller ? `<td>${esc((o.cliente || {}).razon_social)}</td>` : ''}${ME.rol === 'admin' ? `<td class="hide-s">${esc((o.vendedor || {}).nombre)}</td>` : ''}<td class="n">${o.juegos}</td><td><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado])}</span></td></tr>`).join('') + '</table></div>' : '<div class="card mut">No hay pedidos.</div>');
+    r.items.map((o) => `<tr style="cursor:pointer" data-go="${o.id}"><td><a href="#/pedido/${o.id}">${esc(o.codigo)}</a></td><td>${fdate(o.fecha)}</td>${seller ? `<td>${esc((o.cliente || {}).razon_social)}</td>` : ''}${ME.rol === 'admin' ? `<td class="hide-s">${esc((o.vendedor || {}).nombre)}</td>` : ''}<td class="n">${o.juegos}</td><td><span class="tag ${esc(o.estado)}">${esc(ESTADO[o.estado])}</span>${o.traslado && o.traslado.total ? `<span class="tag ${o.traslado.faltante ? 'falta' : 'tras'}">${o.traslado.faltante ? 'Falta stock' : 'Trasladar ' + o.traslado.total}</span>` : ''}</td></tr>`).join('') + '</table></div>' : '<div class="card mut">No hay pedidos.</div>');
   $('#fe').onchange = (e) => { PFILT.estado = e.target.value; vPedidos(); };
   document.querySelectorAll('[data-go]').forEach((tr) => (tr.onclick = () => go('#/pedido/' + tr.dataset.go)));
+}
+// Stock en Talca y Bodega Adicional para un pedido pendiente (solo vendedor/administrador)
+function trasladoHtml(o) {
+  const t = o.traslado; if (!t) return '';
+  const aviso = t.faltante ? `<div class="msg e"><b>Bodega Adicional no alcanza.</b> Para este pedido faltan ${t.faltante} juego${t.faltante > 1 ? 's' : ''} entre ambas sucursales.</div>`
+    : t.total ? `<div class="msg i"><b>Hay que trasladar desde Bodega Adicional a Talca:</b><ul style="margin:6px 0 0;padding-left:20px">${t.lineas.filter((l) => l.trasladar).map((l) => `<li><b>${l.trasladar} juego${l.trasladar > 1 ? 's' : ''}</b> de ${esc(l.sku)} (el pedido necesita ${l.pedido} y Talca tiene ${l.talca})</li>`).join('')}</ul></div>`
+    : '<div class="msg o">Talca tiene stock suficiente para este pedido.</div>';
+  return `<div class="card"><h2>Stock para este pedido</h2>${aviso}<table><tr><th>SKU</th><th class="n">Pedido</th><th class="n">Talca</th><th class="n">Bodega Adic.</th><th class="n">Trasladar</th></tr>${t.lineas.map((l) => `<tr><td>${esc(l.sku)}<br><span class="mut">${esc(l.nombre)}</span></td><td class="n">${l.pedido}</td><td class="n">${l.talca}</td><td class="n">${l.bodega}</td><td class="n">${l.trasladar ? '<b>' + l.trasladar + '</b>' : '—'}${l.faltante ? `<br><span style="color:var(--mal);font-size:13px">faltan ${l.faltante}</span>` : ''}</td></tr>`).join('')}</table></div>`;
 }
 async function vPedido(id) {
   const r = await api('GET', '/api/pedidos/' + encodeURIComponent(id)), o = r.pedido, seller = ME.rol !== 'mayorista';
@@ -297,7 +308,7 @@ async function vPedido(id) {
   if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>
     <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p><div id="m"></div></div>`;
   else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
-  $('#app').innerHTML = `<p><a href="#/pedidos">← Volver</a></p>${acc}${resumenHtml(o)}`;
+  $('#app').innerHTML = `<p><a href="#/pedidos">← Volver</a></p>${acc}${trasladoHtml(o)}${resumenHtml(o)}`;
   const upd = async (body) => { try { await api('PATCH', '/api/pedidos/' + o.id, body); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
   document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => upd({ estado: b.dataset.st })));
   if ($('#sn')) $('#sn').onclick = () => upd({ notaInterna: $('#ni').value });
@@ -327,11 +338,29 @@ async function vUsuarios() {
   document.querySelectorAll('[data-ac]').forEach((b) => (b.onclick = async () => { try { await api('PATCH', '/api/admin/usuarios/' + b.dataset.ac, { activo: b.dataset.v === '1' }); vUsuarios(); } catch (e) { alert(e.message); } }));
   document.querySelectorAll('[data-sv]').forEach((s) => (s.onchange = async () => { try { await api('PATCH', '/api/admin/usuarios/' + s.dataset.sv, { vendedorId: s.value }); } catch (e) { alert(e.message); } }));
 }
+let TF = '';
+async function vTraslados() {
+  const r = await api('GET', '/api/admin/traslados'), rs = r.resumen;
+  const all = r.items, list = all.filter((i) => (TF === 'pedidos' ? i.paraPedidos + i.faltantePedidos > 0 : TF === 'minimo' ? i.paraPedidos + i.faltantePedidos === 0 : true));
+  const lines = list.filter((i) => i.mover > 0).map((i) => `${i.sku} - ${i.nombre} - ${i.mover} juego${i.mover > 1 ? 's' : ''}`);
+  $('#app').innerHTML = `<h1>Traslados de Bodega Adicional a Talca</h1>
+  <div class="msg i">Talca es la sucursal desde donde se despacha y se emiten los documentos de venta, por eso debe tener siempre al menos <b>${r.minimo} juego${r.minimo === 1 ? '' : 's'}</b> de cada SKU, además de lo que piden los pedidos nuevos o en revisión.</div>
+  <div class="card"><div class="flex"><span class="big">${rs.juegos}</span><span>juegos a trasladar en <b>${rs.skus}</b> SKU</span>${rs.skusConPedidos ? `<span class="tag tras">${rs.skusConPedidos} por pedidos</span>` : ''}${rs.sinStockBodega ? `<span class="tag falta">${rs.sinStockBodega} sin stock suficiente en Bodega</span>` : ''}
+  <span class="right flex"><select id="tf" style="width:auto"><option value="">Todo</option><option value="pedidos" ${TF === 'pedidos' ? 'selected' : ''}>Solo para pedidos</option><option value="minimo" ${TF === 'minimo' ? 'selected' : ''}>Solo reponer mínimo</option></select><button class="sec sm" id="cp" ${lines.length ? '' : 'disabled'}>Copiar lista</button></span></div><div id="m"></div></div>
+  ${list.length ? `<div class="card"><table><tr><th>SKU / Producto</th><th class="n">Talca</th><th class="n">Bodega Adic.</th><th class="n hide-s">En pedidos</th><th class="n">Trasladar</th></tr>${list.map((i) => `<tr><td><b>${esc(i.sku)}</b><br>${esc(i.nombre)}${i.codigos.length ? `<br><span class="mut">Pedidos: ${i.codigos.map(esc).join(', ')}</span>` : ''}</td><td class="n">${i.talca === 0 ? '<span class="tag tras">0</span>' : i.talca}</td><td class="n">${i.bodega}</td><td class="n hide-s">${i.pedidos || '—'}</td>
+  <td class="n">${i.mover ? '<b style="font-size:18px">' + i.mover + '</b>' : '—'}${i.paraPedidos && i.paraMinimo ? `<br><span class="mut" style="font-size:12px">${i.paraPedidos} por pedidos + ${i.paraMinimo} de reserva</span>` : i.paraMinimo ? '<br><span class="mut" style="font-size:12px">reserva mínima</span>' : i.paraPedidos ? '<br><span class="mut" style="font-size:12px">por pedidos</span>' : ''}${i.faltantePedidos ? `<br><span class="tag falta" style="margin:0">faltan ${i.faltantePedidos} para pedidos</span>` : i.faltanteMinimo ? `<br><span class="tag falta" style="margin:0">Bodega no alcanza para la reserva (${i.faltanteMinimo})</span>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="card mut">No hay nada que trasladar: Talca tiene lo necesario en todos los SKU.</div>'}`;
+  $('#tf').onchange = (e) => { TF = e.target.value; vTraslados(); };
+  $('#cp').onclick = async () => {
+    const txt = 'Traslado Bodega Adicional → Talca\n' + lines.join('\n');
+    try { await navigator.clipboard.writeText(txt); $('#m').innerHTML = '<div class="msg o">Lista copiada</div>'; }
+    catch (e) { $('#m').innerHTML = `<div class="msg i"><textarea rows="${Math.min(12, lines.length + 1)}" readonly onfocus="this.select()">${esc(txt)}</textarea></div>`; }
+  };
+}
 let PQ = '';
 async function vProductos() {
   const r = await api('GET', '/api/admin/productos?q=' + encodeURIComponent(PQ));
-  $('#app').innerHTML = `<h1>Productos</h1><div class="card"><input id="q" type="search" placeholder="Buscar SKU o nombre" value="${esc(PQ)}"><p class="mut">${r.total} productos${r.total > 200 ? ' (mostrando 200)' : ''}. El stock es la suma de Talca + Bodega Adicional según Bsale; "reservado" son pedidos nuevos o en revisión.</p>
-  <table><tr><th>SKU / Producto</th><th class="n">Precio juego</th><th class="n">Stock (juegos)</th><th class="n hide-s">Reserv. (juegos)</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}${p.medida ? '<br><span class="mut">' + esc(p.medida) + '</span>' : ''}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.stock}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
+  $('#app').innerHTML = `<h1>Productos</h1><div class="card"><input id="q" type="search" placeholder="Buscar SKU o nombre" value="${esc(PQ)}"><p class="mut">${r.total} productos${r.total > 200 ? ' (mostrando 200)' : ''}. Stock por sucursal según Bsale (todo en juegos); "reserv." son los juegos de pedidos nuevos o en revisión.</p>
+  <table><tr><th>SKU / Producto</th><th class="n">Precio juego</th><th class="n">Talca</th><th class="n">Bodega Adic.</th><th class="n hide-s">Reserv.</th><th class="n hide-s">Fotos</th><th></th></tr>${r.items.map((p) => `<tr><td><b>${esc(p.sku)}</b><br>${esc(p.nombre)}${p.medida ? '<br><span class="mut">' + esc(p.medida) + '</span>' : ''}</td><td class="n">${p.precio ? clp(p.precio) : '<span class="tag cancelado">sin precio</span>'}</td><td class="n">${p.talca === 0 ? '<span class="tag tras">0</span>' : p.talca}</td><td class="n">${p.bodega}</td><td class="n hide-s">${p.reservado}</td><td class="n hide-s">${p.fotos}</td>
   <td class="n"><button class="sec sm" data-h="${esc(p.sku)}" data-v="${p.oculto ? 0 : 1}">${p.oculto ? 'Mostrar' : 'Ocultar'}</button></td></tr>`).join('')}</table></div>`;
   let t; $('#q').oninput = (e) => { clearTimeout(t); t = setTimeout(async () => { PQ = e.target.value; await vProductos(); const i = $('#q'); i.focus(); i.setSelectionRange(PQ.length, PQ.length); }, 400); };
   document.querySelectorAll('[data-h]').forEach((b) => (b.onclick = async () => { await api('PATCH', '/api/admin/productos/' + encodeURIComponent(b.dataset.h), { oculto: b.dataset.v === '1' }); vProductos(); }));

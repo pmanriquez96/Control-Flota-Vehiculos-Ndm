@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS products (
   et text NOT NULL DEFAULT '',
   price double precision NOT NULL DEFAULT 0,
   stock int NOT NULL DEFAULT 0,
+  stock_talca int NOT NULL DEFAULT 0,
+  stock_bodega int NOT NULL DEFAULT 0,
   hidden boolean NOT NULL DEFAULT false,
   synced_at timestamptz NOT NULL DEFAULT now()
 );
@@ -77,7 +79,15 @@ CREATE TABLE IF NOT EXISTS kv (
   v jsonb NOT NULL
 );`;
 
-async function init(pool) { await pool.query(SCHEMA); }
+// Columnas agregadas después de la primera versión (para bases que ya existían)
+const MIGRATIONS = [
+  'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_talca int NOT NULL DEFAULT 0',
+  'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_bodega int NOT NULL DEFAULT 0',
+];
+async function init(pool) {
+  await pool.query(SCHEMA);
+  for (const m of MIGRATIONS) await pool.query(m);
+}
 
 // Transacción en una sola conexión (pool.query puede usar conexiones distintas)
 async function withTx(pool, fn) {

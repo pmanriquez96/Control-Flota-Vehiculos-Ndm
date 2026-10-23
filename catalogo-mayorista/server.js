@@ -18,6 +18,8 @@ const MAX_LINEAS = 100, MAX_QTY = 9999;
 // JUEGO_UNIDADES solo sirve para mostrar cuántas llantas trae el pedido.
 const JUEGO = Math.max(1, parseInt(process.env.JUEGO_UNIDADES, 10) || 4);
 const precioJuego = (p) => Math.round(p);
+// Talca es la sucursal de despacho y de emisión de documentos: siempre debe quedar al menos esta cantidad de cada SKU.
+const MIN_TALCA = (() => { const n = parseInt(process.env.TALCA_MINIMO, 10); return Number.isFinite(n) && n >= 0 ? n : 1; })();
 
 function createApp(pool, opts = {}) {
   const app = express();
@@ -124,7 +126,7 @@ function createApp(pool, opts = {}) {
   const aroNum = (p) => (p.aro ? Number(p.aro) : 999);
   async function visibleProducts() {
     const [rows, res] = await Promise.all([
-      q('SELECT sku,name,category,medida,aro,ancho,pcd,et,price,stock FROM products WHERE hidden=false AND stock>0 AND price>0'),
+      q('SELECT sku,name,category,medida,aro,ancho,pcd,et,price,stock,stock_talca,stock_bodega FROM products WHERE hidden=false AND stock>0 AND price>0'),
       reservedMap(),
     ]);
     return rows.rows.map((p) => Object.assign(p, { max: Math.min(MAX_QTY, p.stock - (res.get(p.sku) || 0)) })).filter((p) => p.max > 0)
@@ -147,6 +149,8 @@ function createApp(pool, opts = {}) {
       sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, aro: p.aro, ancho: p.ancho, pcd: p.pcd, et: p.et,
       precio: precioJuego(p.price), max: p.max,
       fotos: ph.filter((x) => x.sku === p.sku).map((x) => '/api/foto/' + x.file_id),
+      // el stock por sucursal solo lo ven vendedores y administradores
+      ...(req.user.role === 'mayorista' ? {} : { stockTalca: p.stock_talca, stockBodega: p.stock_bodega }),
     }));
     res.json({ items, total: list.length, pagina: page, paginas: Math.max(1, Math.ceil(list.length / per)), categorias: cats, pcds, aros });
   }));
@@ -208,6 +212,25 @@ function createApp(pool, opts = {}) {
     return rows.map((o) => shape(o, its.filter((i) => i.order_id === o.id)));
   }
 
+  // Para vendedores y administradores: qué hay que traer de Bodega Adicional a Talca para atender cada pedido pendiente.
+  async function addTraslados(u, orders) {
+    if (u.role === 'mayorista') return orders;
+    const pend = orders.filter((o) => PENDIENTES.includes(o.estado));
+    const skus = [...new Set(pend.flatMap((o) => o.items.map((i) => i.sku)))];
+    if (!skus.length) return orders;
+    const rows = (await q(`SELECT sku,stock_talca,stock_bodega FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows;
+    const st = new Map(rows.map((r) => [r.sku, r]));
+    pend.forEach((o) => {
+      const lineas = o.items.map((i) => {
+        const s = st.get(i.sku) || { stock_talca: 0, stock_bodega: 0 };
+        const trasladar = Math.max(0, i.qty - s.stock_talca);
+        return { sku: i.sku, nombre: i.name, pedido: i.qty, talca: s.stock_talca, bodega: s.stock_bodega, trasladar, faltante: Math.max(0, trasladar - s.stock_bodega) };
+      });
+      o.traslado = { lineas, total: lineas.reduce((n, l) => n + l.trasladar, 0), faltante: lineas.reduce((n, l) => n + l.faltante, 0) };
+    });
+    return orders;
+  }
+
   app.post('/api/pedidos', loadUser, gate, only('mayorista'), wrap(async (req, res) => {
     const u = req.user;
     const seller = u.seller_id ? (await q('SELECT id,name,phone FROM users WHERE id=$1 AND active=true', [u.seller_id])).rows[0] : null;
@@ -259,7 +282,7 @@ function createApp(pool, opts = {}) {
 
   app.get('/api/pedidos', loadUser, gate, wrap(async (req, res) => {
     const estado = ESTADOS.includes(req.query.estado) ? req.query.estado : '';
-    res.json({ items: await ordersFor(req.user, estado ? 'o.estado=$1' : '', estado ? [estado] : []) });
+    res.json({ items: await addTraslados(req.user, await ordersFor(req.user, estado ? 'o.estado=$1' : '', estado ? [estado] : [])) });
   }));
   app.get('/api/pedidos/resumen', loadUser, gate, wrap(async (req, res) => {
     const sc = scope(req.user);
@@ -268,7 +291,7 @@ function createApp(pool, opts = {}) {
     res.json(out);
   }));
   app.get('/api/pedidos/:id', loadUser, gate, wrap(async (req, res) => {
-    const l = await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]);
+    const l = await addTraslados(req.user, await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]));
     if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
     const seller = { name: l[0].vendedor.nombre, phone: l[0].vendedor.telefono };
     res.json({ pedido: l[0], whatsapp: req.user.role === 'mayorista' ? waLink(l[0], seller) : '' });
@@ -363,11 +386,41 @@ function createApp(pool, opts = {}) {
   app.get('/api/admin/productos', ...admin, wrap(async (req, res) => {
     const resv = await reservedMap();
     const ph = new Map((await q('SELECT sku, COUNT(*) AS n FROM photos GROUP BY sku')).rows.map((x) => [x.sku, Number(x.n)]));
-    let rows = (await q('SELECT sku,name,category,medida,price,stock,hidden FROM products ORDER BY name')).rows;
+    let rows = (await q('SELECT sku,name,category,medida,price,stock,stock_talca,stock_bodega,hidden FROM products ORDER BY name')).rows;
     const f = String(req.query.q || '');
     if (f) rows = rows.filter((p) => matches(p.sku + ' ' + p.name, f));
     const total = rows.length;
-    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: precioJuego(p.price), stock: p.stock, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
+    res.json({ total, items: rows.slice(0, 200).map((p) => ({ sku: p.sku, nombre: p.name, categoria: p.category, medida: p.medida, precio: precioJuego(p.price), stock: p.stock, talca: p.stock_talca, bodega: p.stock_bodega, reservado: resv.get(p.sku) || 0, oculto: p.hidden, fotos: ph.get(p.sku) || 0 })) });
+  }));
+  // Qué trasladar de Bodega Adicional a Talca: lo que piden los pedidos pendientes (nuevos o en revisión)
+  // más lo necesario para que Talca siempre conserve al menos MIN_TALCA de cada SKU (de ahí se despacha y se emiten los documentos).
+  app.get('/api/admin/traslados', ...admin, wrap(async (req, res) => {
+    const prods = (await q('SELECT sku,name,medida,aro,stock_talca,stock_bodega FROM products WHERE hidden=false AND stock>0')).rows;
+    const pend = (await q(`SELECT i.sku, i.qty, i.order_id FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.estado IN ('nuevo','revision')`)).rows;
+    const req_ = new Map(), cods = new Map();
+    pend.forEach((x) => { req_.set(x.sku, (req_.get(x.sku) || 0) + x.qty); (cods.get(x.sku) || cods.set(x.sku, new Set()).get(x.sku)).add(code(x.order_id)); });
+    const items = [];
+    for (const p of prods) {
+      const pedidos = req_.get(p.sku) || 0;
+      const paraPedidos = Math.max(0, pedidos - p.stock_talca);
+      const total = Math.max(0, pedidos + MIN_TALCA - p.stock_talca);
+      const paraMinimo = total - paraPedidos;
+      if (!total) continue;
+      const movPedidos = Math.min(paraPedidos, p.stock_bodega);
+      const movMinimo = Math.min(paraMinimo, p.stock_bodega - movPedidos);
+      items.push({
+        sku: p.sku, nombre: p.name, medida: p.medida, aro: p.aro, talca: p.stock_talca, bodega: p.stock_bodega,
+        pedidos, codigos: [...(cods.get(p.sku) || [])].sort(),
+        paraPedidos: movPedidos, paraMinimo: movMinimo, mover: movPedidos + movMinimo,
+        faltantePedidos: paraPedidos - movPedidos, faltanteMinimo: paraMinimo - movMinimo,
+      });
+    }
+    // primero lo que necesitan los pedidos, luego la reposición mínima; por aro y nombre
+    items.sort((a, b) => (b.paraPedidos + b.faltantePedidos > 0) - (a.paraPedidos + a.faltantePedidos > 0) || aroNum(a) - aroNum(b) || a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+    res.json({
+      minimo: MIN_TALCA, items,
+      resumen: { skus: items.filter((i) => i.mover > 0).length, juegos: items.reduce((n, i) => n + i.mover, 0), skusConPedidos: items.filter((i) => i.paraPedidos > 0).length, sinStockBodega: items.filter((i) => i.faltantePedidos > 0).length },
+    });
   }));
   app.patch('/api/admin/productos/:sku', ...admin, wrap(async (req, res) => {
     const r = await q('UPDATE products SET hidden=$1 WHERE sku=$2', [!!(req.body || {}).oculto, String(req.params.sku).toUpperCase()]);
@@ -434,6 +487,7 @@ function sourcesFromEnv() {
       client: makeClient({ token: process.env.BSALE_TOKEN }),
       opts: {
         offices: (process.env.BSALE_OFFICES || 'Talca,Bodega Adicional').split(',').map((s) => s.trim()).filter(Boolean),
+        mainOffice: process.env.BSALE_MAIN_OFFICE || '', // sucursal de despacho (por defecto, la primera de BSALE_OFFICES)
         priceListId: process.env.BSALE_PRICE_LIST_ID ? Number(process.env.BSALE_PRICE_LIST_ID) : null,
         priceListName: process.env.BSALE_PRICE_LIST || 'Mayorista',
         priceMode: process.env.PRICE_MODE === 'neto' ? 'neto' : 'iva', // por defecto, con IVA incluido

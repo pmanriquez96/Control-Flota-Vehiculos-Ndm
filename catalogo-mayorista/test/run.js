@@ -229,6 +229,39 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   await call(A, 'PATCH', '/api/admin/usuarios/' + (await pool.query("SELECT id FROM users WHERE email='m2@x.cl'")).rows[0].id, { activo: false });
   ok((await call(M2, 'GET', '/api/me')).s === 401, 'usuario desactivado pierde el acceso');
 
+  // ---- stock por sucursal y traslados de Bodega Adicional a Talca ----
+  const apx = (await call(A, 'GET', '/api/admin/productos')).j.items;
+  ok(apx.find((p) => p.sku === 'AB-AGOTADO').talca === 0 && apx.find((p) => p.sku === 'AB-AGOTADO').bodega === 3 && apx.find((p) => p.sku === 'AB-265').talca === 20, 'el administrador ve el stock de Talca y de Bodega Adicional por separado');
+  const cv = (await call(V1b, 'GET', '/api/productos?q=AB-AGOTADO')).j.items[0];
+  ok(cv.stockTalca === 0 && cv.stockBodega === 3 && cv.max === 3, 'el vendedor ve el stock de ambas sucursales en el catálogo');
+  ok(!JSON.stringify((await call(M1, 'GET', '/api/productos?q=AB-AGOTADO')).j).toLowerCase().includes('stock'), 'el mayorista no ve ningún stock');
+  ok((await call(V1b, 'GET', '/api/admin/traslados')).s === 403 && (await call(M1, 'GET', '/api/admin/traslados')).s === 403, 'los traslados son solo del administrador');
+  const row = async () => (await call(A, 'GET', '/api/admin/traslados')).j.items.find((i) => i.sku === 'AB-AGOTADO');
+  let t0 = await row();
+  ok(t0 && t0.talca === 0 && t0.bodega === 3 && t0.mover === 1 && t0.paraMinimo === 1 && t0.paraPedidos === 0, 'sin pedidos: igual hay que dejar 1 en Talca (Talca 0, Bodega 3 -> trasladar 1)');
+  ok(!(await call(A, 'GET', '/api/admin/traslados')).j.items.some((i) => i.sku === 'AB-265' && i.mover > 0 && i.paraMinimo > 0 && i.talca >= i.pedidos + 1), 'no pide traslado donde Talca ya tiene lo suficiente');
+  const pa = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 2 }] });
+  const dA = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido;
+  ok(dA.traslado.total === 2 && dA.traslado.faltante === 0 && dA.traslado.lineas[0].talca === 0 && dA.traslado.lineas[0].bodega === 3 && dA.traslado.lineas[0].trasladar === 2, 'el pedido avisa cuánto trasladar: pide 2, Talca tiene 0 -> trasladar 2 desde Bodega Adicional');
+  ok((await call(M1, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado === undefined, 'el cliente no ve el aviso de traslado');
+  const lista = (await call(V1b, 'GET', '/api/pedidos')).j.items.find((o) => o.id === pa.j.pedido.id);
+  ok(lista.traslado.total === 2, 'la lista de pedidos también marca el traslado');
+  t0 = await row();
+  ok(t0.pedidos === 2 && t0.paraPedidos === 2 && t0.paraMinimo === 1 && t0.mover === 3 && t0.faltantePedidos === 0 && t0.codigos.length === 1, 'con 2 en pedidos: trasladar 2 + 1 de reserva en Talca = 3 (Bodega tiene 3)');
+  await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 1 }] });
+  t0 = await row();
+  ok(t0.pedidos === 3 && t0.paraPedidos === 3 && t0.mover === 3 && t0.faltanteMinimo === 1 && t0.faltantePedidos === 0, 'con 3 en pedidos y solo 3 en Bodega: se priorizan los pedidos y falta 1 para la reserva de Talca');
+  state.talca[3] = 2; state.bodega[3] = 1; await app.doSync(false); // se trasladaron 2
+  t0 = await row();
+  ok(t0.talca === 2 && t0.bodega === 1 && t0.paraPedidos === 1 && t0.paraMinimo === 0 && t0.mover === 1 && t0.faltantePedidos === 0 && t0.faltanteMinimo === 1, 'tras trasladar 2: Talca 2, pedidos 3 -> trasladar 1 y sigue faltando 1 de reserva');
+  state.talca[3] = 3; state.bodega[3] = 0; await app.doSync(false);
+  t0 = await row();
+  ok(t0.paraPedidos === 0 && t0.faltantePedidos === 0 && t0.faltanteMinimo === 1 && t0.mover === 0, 'si Bodega queda en 0 y Talca justo alcanza para los pedidos, avisa que falta reserva');
+  const dB = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido;
+  ok(dB.traslado.total === 0, 'con Talca suficiente el pedido ya no pide traslado');
+  const resTr = (await call(A, 'GET', '/api/admin/traslados')).j;
+  ok(resTr.minimo === 1 && resTr.resumen.juegos === resTr.items.reduce((n, i) => n + i.mover, 0), 'resumen de traslados coherente');
+
   // ---- fotos desde un enlace de carpeta pública (sin cuenta de servicio) ----
   ok((await call(A, 'GET', '/api/admin/drive')).j.modo === 'cuenta', 'al inicio las fotos vienen de la cuenta de servicio');
   ok((await call(V1b, 'POST', '/api/admin/drive', { enlace: 'x' })).s === 403, 'solo el administrador cambia la carpeta de fotos');

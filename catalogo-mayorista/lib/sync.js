@@ -26,19 +26,20 @@ async function runSync(pool, { bsale, drive, forcePhotos }) {
       await withTx(pool, async (c) => {
         for (const p of cat.items) {
           await c.query(
-            `INSERT INTO products(sku,variant_id,name,category,medida,aro,ancho,pcd,et,price,stock,synced_at)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            `INSERT INTO products(sku,variant_id,name,category,medida,aro,ancho,pcd,et,price,stock,stock_talca,stock_bodega,synced_at)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
              ON CONFLICT (sku) DO UPDATE SET variant_id=EXCLUDED.variant_id,name=EXCLUDED.name,category=EXCLUDED.category,
                medida=EXCLUDED.medida,aro=EXCLUDED.aro,ancho=EXCLUDED.ancho,pcd=EXCLUDED.pcd,et=EXCLUDED.et,
-               price=EXCLUDED.price,stock=EXCLUDED.stock,synced_at=EXCLUDED.synced_at`,
-            [p.sku, p.variantId, p.name, p.category, p.medida, p.aro, p.ancho, p.pcd, p.et, p.price, p.stock, stamp]);
+               price=EXCLUDED.price,stock=EXCLUDED.stock,stock_talca=EXCLUDED.stock_talca,stock_bodega=EXCLUDED.stock_bodega,synced_at=EXCLUDED.synced_at`,
+            [p.sku, p.variantId, p.name, p.category, p.medida, p.aro, p.ancho, p.pcd, p.et, p.price, p.stock, p.stockTalca, p.stockBodega, stamp]);
         }
         // lo que ya no vino en Bsale queda sin stock
-        await c.query('UPDATE products SET stock=0 WHERE synced_at < $1', [stamp]);
+        await c.query('UPDATE products SET stock=0, stock_talca=0, stock_bodega=0 WHERE synced_at < $1', [stamp]);
       });
       res.productos = cat.items.length;
       res.conStock = cat.items.filter((p) => p.stock > 0 && p.price > 0).length;
       res.sucursales = cat.offices;
+      res.sucursalPrincipal = cat.mainOffice;
       res.listaPrecios = cat.priceListId;
     }
     if (drive) {

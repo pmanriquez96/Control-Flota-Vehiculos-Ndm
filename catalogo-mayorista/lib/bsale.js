@@ -79,7 +79,10 @@ async function fetchCatalog(client, opts) {
   if (chosen.length < wantedOffices.length) log('Aviso: solo se encontraron ' + chosen.map((o) => o.name).join(', '));
 
   // 2) stock por variante, sumando sucursales
-  const stock = new Map();
+  // Se guarda por separado la sucursal principal (de donde se despacha y se emiten los documentos: Talca)
+  // y el resto (Bodega Adicional); el catálogo usa la suma.
+  const main = pickOffices(chosen, [opts.mainOffice || wantedOffices[0]])[0] || chosen[0];
+  const stock = new Map(), stockMain = new Map();
   for (const o of chosen) {
     const rows = await client.all('/stocks.json?officeid=' + o.id);
     for (const s of rows) {
@@ -87,6 +90,7 @@ async function fetchCatalog(client, opts) {
       if (!vid) continue;
       const q = Number(s.quantityAvailable != null ? s.quantityAvailable : s.quantity) || 0;
       stock.set(vid, (stock.get(vid) || 0) + q);
+      if (o.id === main.id) stockMain.set(vid, (stockMain.get(vid) || 0) + q);
     }
   }
 
@@ -127,9 +131,12 @@ async function fetchCatalog(client, opts) {
       medida: pm.medida, aro: pm.aro, ancho: pm.ancho, pcd: pm.pcd, et: pm.et,
       price: price.get(v.id) || 0,
       stock: Math.max(0, Math.floor(stock.get(v.id) || 0)),
+      stockTalca: Math.max(0, Math.floor(stockMain.get(v.id) || 0)),
     });
+    const it = items[items.length - 1];
+    it.stockBodega = Math.max(0, it.stock - it.stockTalca);
   }
-  return { items, offices: chosen.map((o) => o.name), priceListId: plId };
+  return { items, offices: chosen.map((o) => o.name), mainOffice: main.name, priceListId: plId };
 }
 
 module.exports = { makeClient, fetchCatalog, pickOffices, parseRin, norm };
