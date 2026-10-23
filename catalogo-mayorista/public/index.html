@@ -26,13 +26,13 @@ button,.btn{font:inherit;border:0;border-radius:10px;padding:11px 16px;backgroun
 button.sec,.btn.sec{background:#e6edf5;color:var(--az)}button.mal{background:var(--mal)}button.wa,.btn.wa{background:#1fa855}button:disabled{opacity:.5}
 button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .msg{padding:10px 12px;border-radius:9px;margin:10px 0;font-size:15px}.msg.e{background:#fdecea;color:#8d2418}.msg.o{background:#e6f5ec;color:#145c32}.msg.i{background:#e8f0fb;color:#173f73}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.grid{display:flex;flex-direction:column;gap:12px}
 .prod{background:#fff;border:1px solid var(--bd);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column}
-.fotos{position:relative;aspect-ratio:4/3;background:#e9eef4;overflow:hidden}
-.fotos .sl{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.fotos .sl::-webkit-scrollbar{display:none}
-.fotos img{flex:0 0 100%;width:100%;height:100%;object-fit:contain;scroll-snap-align:center;background:#fff}
-.fotos .nof{display:grid;place-items:center;height:100%;color:var(--mut);font-size:14px}
-.dots{position:absolute;bottom:6px;left:0;right:0;display:flex;gap:5px;justify-content:center;pointer-events:none}.dots s{width:7px;height:7px;border-radius:50%;background:#0003}.dots s.on{background:var(--az2)}
+.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#e9eef4}
+.fotos .ph{aspect-ratio:4/3;background:#fff;overflow:hidden;cursor:zoom-in}.fotos img{width:100%;height:100%;object-fit:contain;display:block}
+.fotos .nof{grid-column:1/-1;display:grid;place-items:center;aspect-ratio:12/3;color:var(--mut);font-size:14px}
+.zoom{position:fixed;inset:0;background:#000d;z-index:50;display:grid;place-items:center;padding:16px;cursor:zoom-out}.zoom img{max-width:100%;max-height:100%;background:#fff;border-radius:8px}
+@media(min-width:760px){.prod{flex-direction:row}.prod .fotos{flex:0 0 58%}.prod .pb{padding:16px 18px;justify-content:center}.prod .nm{font-size:17px}.prod .qty{margin-top:8px;max-width:340px}}
 .pb{padding:10px 12px;display:flex;flex-direction:column;gap:5px;flex:1}.pb .sku{font-size:12px;color:var(--mut)}.pb .nm{font-weight:600;font-size:15px}
 .pb .pr{font-size:20px;font-weight:700;color:var(--az)}.pb .pr small{font-size:12px;color:var(--mut);font-weight:400}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
@@ -203,7 +203,7 @@ async function vCatalogo() {
   const card = (p) => {
     const inCart = (cart[p.sku] || {}).qty || 0, left = Math.max(0, p.max - inCart);
     const specs = [p.ancho ? 'Ancho ' + p.ancho + '"' : '', p.pcd ? 'PCD ' + p.pcd : '', p.et ? 'ET ' + p.et : ''].filter(Boolean);
-    return `<div class="prod"><div class="fotos">${p.fotos.length ? `<div class="sl">${p.fotos.map((u) => `<img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}">`).join('')}</div>${p.fotos.length > 1 ? `<div class="dots">${p.fotos.map((_, i) => `<s class="${i ? '' : 'on'}"></s>`).join('')}</div>` : ''}` : '<div class="nof">Sin foto</div>'}</div>
+    return `<div class="prod"><div class="fotos">${p.fotos.length ? p.fotos.map((u) => `<div class="ph"><img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}"></div>`).join('') : '<div class="nof">Sin foto</div>'}</div>
     <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>${specs.length ? `<span class="specs">${specs.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` : ''}
     <span class="pr">${clp(p.precio)} <small>+ IVA c/u</small></span>
     ${buy ? (left > 0 ? `<div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="mut" style="font-size:13px">Disponible para pedir: ${p.max}</span>`}</div></div>`;
@@ -214,9 +214,9 @@ async function vCatalogo() {
     `<div class="pager"><button class="sec sm" id="pp" ${r.pagina <= 1 ? 'disabled' : ''}>← Anterior</button><span>Página ${r.pagina} de ${r.paginas} · ${r.total} productos</span><button class="sec sm" id="pn" ${r.pagina >= r.paginas ? 'disabled' : ''}>Siguiente →</button></div><div class="pad"></div>`;
   $('#pp').onclick = () => { CAT.pagina--; vCatalogo(); scrollTo(0, 0); };
   $('#pn').onclick = () => { CAT.pagina++; vCatalogo(); scrollTo(0, 0); };
-  document.querySelectorAll('.sl').forEach((sl) => sl.addEventListener('scroll', () => {
-    const i = Math.round(sl.scrollLeft / sl.clientWidth), dots = sl.parentNode.querySelectorAll('.dots s'); dots.forEach((d, k) => d.classList.toggle('on', k === i));
-  }, { passive: true }));
+  document.querySelectorAll('.ph img').forEach((im) => (im.onclick = () => {
+    const z = document.createElement('div'); z.className = 'zoom'; z.innerHTML = `<img src="${esc(im.src)}" alt="">`; z.onclick = () => z.remove(); document.body.appendChild(z);
+  }));
   document.querySelectorAll('[data-add]').forEach((b) => (b.onclick = () => {
     const input = b.parentNode.querySelector('input'), c = cartGet(), sku = b.dataset.add, max = Number(b.dataset.max);
     let n = Math.floor(Number(input.value)); if (!(n >= 1)) n = 1;
