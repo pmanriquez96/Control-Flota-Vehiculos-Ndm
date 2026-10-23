@@ -4,7 +4,7 @@ const fs = require('fs');
 const express = require('express');
 const db = require('./lib/db');
 const auth = require('./lib/auth');
-const { makeClient, createNotaVenta } = require('./lib/bsale');
+const { makeClient } = require('./lib/bsale');
 const { makeDrive, loadCredentials } = require('./lib/drive');
 const { runSync, getKv, state: syncState } = require('./lib/sync');
 const { cleanProfile, REGIONES } = require('./lib/profile');
@@ -27,8 +27,6 @@ function createApp(pool, opts = {}) {
   let drive = opts.drive || null;
   let bsale = opts.bsale || null;
   let orderLock = Promise.resolve(); // un pedido a la vez (evita pasarse del stock)
-  const nvConf = () => (bsale && bsale.opts && bsale.opts.nv) || null; // nota de venta en Bsale (solo si BSALE_NV=on)
-  const nvBusy = new Set();
 
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
@@ -80,7 +78,7 @@ function createApp(pool, opts = {}) {
   app.post('/api/logout', (req, res) => { auth.clearSession(res); res.json({ ok: true }); });
 
   async function meInfo(u) {
-    const out = { id: u.id, nombre: u.name, email: u.email, rol: u.role, telefono: u.phone, cambiarClave: u.must_change, empresa, juego: JUEGO, notaVenta: !!nvConf() };
+    const out = { id: u.id, nombre: u.name, email: u.email, rol: u.role, telefono: u.phone, cambiarClave: u.must_change, empresa, juego: JUEGO };
     if (u.role === 'mayorista') {
       out.perfilCompleto = !!u.perfil_ok;
       const s = u.seller_id ? (await q('SELECT name, phone FROM users WHERE id=$1', [u.seller_id])).rows[0] : null;
@@ -115,10 +113,8 @@ function createApp(pool, opts = {}) {
 
   /* ---------- catálogo ---------- */
   async function reservedMap() {
-    // Con nota de venta, el stock de Bsale baja recién en la próxima sincronización: hasta entonces el pedido confirmado sigue apartado.
-    const since = nvConf() ? (syncState.last && syncState.last.at) || (await getKv(pool, 'lastSync') || {}).at || null : null;
     const r = await q(`SELECT i.sku, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id=i.order_id
-                       WHERE o.estado IN ('nuevo','revision')${since ? " OR (o.estado='confirmado' AND o.bsale_id IS NOT NULL AND o.confirmed_at > $1)" : ''} GROUP BY i.sku`, since ? [since] : []);
+                       WHERE o.estado IN ('nuevo','revision') GROUP BY i.sku`);
     return new Map(r.rows.map((x) => [x.sku, Number(x.n)])); // juegos apartados por pedidos nuevos o en revisión
   }
   // El stock real nunca sale del servidor: solo "max", el tope que se puede pedir.
@@ -190,7 +186,6 @@ function createApp(pool, opts = {}) {
     const its = items.map((i) => ({ sku: i.sku, name: i.name, qty: i.qty, precio: Math.round(i.price), subtotal: Math.round(i.price * i.qty) }));
     return {
       id: o.id, codigo: code(o.id), estado: o.estado, fecha: o.created_at, actualizado: o.updated_at, notas: o.notes, notaInterna: o.internal_note,
-      notaVenta: { id: o.bsale_id, numero: o.bsale_number, url: o.bsale_url, error: o.bsale_error },
       cliente: o.customer, vendedor: { id: o.seller_id, nombre: o.seller_name, telefono: o.seller_phone },
       items: its, juegos: its.reduce((s, i) => s + i.qty, 0), unidades: its.reduce((s, i) => s + i.qty, 0) * JUEGO, total: its.reduce((s, i) => s + i.subtotal, 0),
     };
@@ -209,30 +204,6 @@ function createApp(pool, opts = {}) {
     if (!rows.length) return [];
     const its = (await q(`SELECT order_id,sku,name,qty,price FROM order_items WHERE order_id IN (${rows.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY id`, rows.map((r) => r.id))).rows;
     return rows.map((o) => shape(o, its.filter((i) => i.order_id === o.id)));
-  }
-
-  // Crea la nota de venta una sola vez por pedido. Devuelve {} si todo bien o {error}.
-  async function ensureNota(o) {
-    const nv = nvConf();
-    if (!nv || o.notaVenta.id) return {};
-    if (nvBusy.has(o.id)) return { error: 'Ya se está creando la nota de venta de este pedido' };
-    nvBusy.add(o.id);
-    try {
-      const lines = (await q(`SELECT i.sku, i.qty, i.net, i.variant_id, p.variant_id AS pv, p.net AS pnet FROM order_items i LEFT JOIN products p ON p.sku=i.sku WHERE i.order_id=$1 ORDER BY i.id`, [o.id])).rows
-        .map((i) => ({ sku: i.sku, qty: i.qty, variantId: i.variant_id || i.pv, net: i.net > 0 ? i.net : i.pnet }));
-      const bad = lines.find((i) => !i.variantId || !(i.net > 0));
-      if (bad) throw new Error('El producto ' + bad.sku + ' no tiene precio neto o código en Bsale');
-      const doc = await createNotaVenta(bsale.client, nv, { codigo: o.codigo, cliente: o.cliente, items: lines });
-      await q("UPDATE orders SET bsale_id=$1, bsale_number=$2, bsale_url=$3, bsale_error='', confirmed_at=now() WHERE id=$4", [doc.id, doc.number, doc.url, o.id]);
-      // el stock real cambia en Bsale: actualizar el catálogo sin esperar al próximo ciclo
-      if (!syncState.running) setTimeout(() => doSync(false).catch(() => {}), 1500);
-      return {};
-    } catch (e) {
-      console.error('Nota de venta', o.codigo, e.message);
-      const msg = 'No se pudo crear la nota de venta en Bsale: ' + e.message;
-      await q('UPDATE orders SET bsale_error=$1 WHERE id=$2', [msg.slice(0, 400), o.id]);
-      return { error: msg };
-    } finally { nvBusy.delete(o.id); }
   }
 
   app.post('/api/pedidos', loadUser, gate, only('mayorista'), wrap(async (req, res) => {
@@ -255,7 +226,7 @@ function createApp(pool, opts = {}) {
     // un pedido a la vez: revisa el stock y lo guarda sin que otro se cuele en el medio
     const job = orderLock.then(async () => {
       const skus = [...want.keys()];
-      const prods = (await q(`SELECT sku,variant_id,name,price,net,stock,hidden FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows;
+      const prods = (await q(`SELECT sku,name,price,stock,hidden FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows;
       const resv = await reservedMap();
       const problemas = [];
       for (const sku of skus) {
@@ -271,7 +242,7 @@ function createApp(pool, opts = {}) {
         const o = (await client.query('INSERT INTO orders(customer_id,seller_id,notes,customer) VALUES($1,$2,$3,$4) RETURNING id', [u.id, seller.id, notes, JSON.stringify(cliente)])).rows[0];
         for (const sku of skus) {
           const p = prods.find((x) => x.sku === sku);
-          await client.query('INSERT INTO order_items(order_id,sku,name,qty,price,net,variant_id) VALUES($1,$2,$3,$4,$5,$6,$7)', [o.id, sku, p.name, want.get(sku), precioJuego(p.price), p.net, p.variant_id]); // qty en juegos, precio por juego
+          await client.query('INSERT INTO order_items(order_id,sku,name,qty,price) VALUES($1,$2,$3,$4,$5)', [o.id, sku, p.name, want.get(sku), precioJuego(p.price)]); // qty en juegos, precio por juego
         }
         await client.query('COMMIT');
         return { id: o.id };
@@ -312,22 +283,8 @@ function createApp(pool, opts = {}) {
     }
     if (b.notaInterna !== undefined) { p.push(String(b.notaInterna).slice(0, 500)); sets.push('internal_note=$' + p.length); }
     if (!sets.length) return res.status(400).json({ error: 'Nada que cambiar' });
-    // Al confirmar se crea la nota de venta en Bsale; si Bsale falla, el pedido NO queda confirmado
-    if (b.estado === 'confirmado') {
-      const r = await ensureNota(l[0]);
-      if (r.error) return res.status(502).json({ error: r.error });
-    }
     p.push(l[0].id);
     await q(`UPDATE orders SET ${sets.join(',')}, updated_at=now() WHERE id=$${p.length}`, p);
-    res.json({ ok: true, pedido: await loadOrder(l[0].id) });
-  }));
-  app.post('/api/pedidos/:id/nota-venta', loadUser, gate, only('admin', 'vendedor'), wrap(async (req, res) => {
-    const l = await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]);
-    if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
-    if (l[0].estado !== 'confirmado') return res.status(409).json({ error: 'Primero confirma el pedido' });
-    if (!nvConf()) return res.status(409).json({ error: 'La nota de venta en Bsale no está activada' });
-    const r = await ensureNota(l[0]);
-    if (r.error) return res.status(502).json({ error: r.error });
     res.json({ ok: true, pedido: await loadOrder(l[0].id) });
   }));
   app.post('/api/pedidos/:id/cancelar', loadUser, gate, only('mayorista'), wrap(async (req, res) => {
@@ -446,12 +403,6 @@ function sourcesFromEnv() {
         priceListId: process.env.BSALE_PRICE_LIST_ID ? Number(process.env.BSALE_PRICE_LIST_ID) : null,
         priceListName: process.env.BSALE_PRICE_LIST || 'Mayorista',
         priceMode: process.env.PRICE_MODE === 'neto' ? 'neto' : 'iva', // por defecto, con IVA incluido
-        // Nota de venta al confirmar: solo si BSALE_NV=on (evita emitir documentos por accidente)
-        nv: process.env.BSALE_NV === 'on' ? {
-          office: process.env.BSALE_NV_OFFICE || 'Talca',
-          docTypeId: process.env.BSALE_NV_DOCTYPE_ID ? Number(process.env.BSALE_NV_DOCTYPE_ID) : null,
-          docTypeName: process.env.BSALE_NV_DOCTYPE || 'Nota de venta',
-        } : null,
       },
     };
   } else console.warn('BSALE_TOKEN no definido: el catálogo no se sincroniza.');

@@ -292,30 +292,16 @@ async function vPedidos() {
   document.querySelectorAll('[data-go]').forEach((tr) => (tr.onclick = () => go('#/pedido/' + tr.dataset.go)));
 }
 async function vPedido(id) {
-  const r = await api('GET', '/api/pedidos/' + encodeURIComponent(id)), o = r.pedido, seller = ME.rol !== 'mayorista', nv = o.notaVenta || {};
+  const r = await api('GET', '/api/pedidos/' + encodeURIComponent(id)), o = r.pedido, seller = ME.rol !== 'mayorista';
   let acc = '';
-  if (seller) {
-    const nvTxt = nv.id ? `<div class="msg o">Nota de venta creada en Bsale: <b>N° ${esc(nv.numero || nv.id)}</b>${nv.url ? ` · <a href="${esc(nv.url)}" target="_blank" rel="noopener">Ver documento</a>` : ''}</div>` : nv.error ? `<div class="msg e">${esc(nv.error)}</div>` : '';
-    const locked = !!nv.id || o.estado === 'cancelado'; // con nota creada, cualquier anulación se hace en Bsale
-    const btns = locked ? '' : `${o.estado !== 'revision' && o.estado !== 'confirmado' ? '<button class="sec" data-st="revision">Marcar en revisión</button>' : ''}${o.estado !== 'confirmado' ? `<button data-st="confirmado" style="background:var(--ok)">${ME.notaVenta ? 'Confirmar y crear nota de venta' : 'Confirmar'}</button>` : ''}${o.estado !== 'rechazado' && o.estado !== 'confirmado' ? '<button class="mal" data-st="rechazado">Rechazar</button>' : ''}`;
-    const retry = o.estado === 'confirmado' && !nv.id && ME.notaVenta ? '<button id="gnv">Generar nota de venta en Bsale</button>' : '';
-    acc = `<div class="card"><h2>Gestión</h2>${nvTxt}${locked && nv.id ? '<p class="mut">El pedido está confirmado. Para anularlo, hazlo directamente en Bsale.</p>' : ''}<div class="flex">${btns}${retry}</div><div id="m"></div>
-    <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p></div>`;
-  } else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
+  if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>
+    <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p><div id="m"></div></div>`;
+  else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
   $('#app').innerHTML = `<p><a href="#/pedidos">← Volver</a></p>${acc}${resumenHtml(o)}`;
-  const fail = (e) => { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; document.querySelectorAll('#app button').forEach((b) => (b.disabled = false)); };
-  // Confirmación dentro de la página (sin ventanas emergentes)
-  const ask = (texto, si, fn) => { $('#m').innerHTML = `<div class="msg i">${texto}<div class="flex" style="margin-top:8px"><button id="ys">${si}</button><button class="sec" id="no">Volver</button></div></div>`; $('#no').onclick = () => ($('#m').innerHTML = ''); $('#ys').onclick = async () => { document.querySelectorAll('#app button').forEach((b) => (b.disabled = true)); $('#m').innerHTML = '<div class="msg i">Un momento…</div>'; try { await fn(); vPedido(id); } catch (e) { fail(e); } }; };
-  const upd = (body) => api('PATCH', '/api/pedidos/' + o.id, body);
-  document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => {
-    const st = b.dataset.st;
-    if (st === 'confirmado') return ask(ME.notaVenta ? 'Al confirmar se crea la <b>nota de venta en Bsale</b> con estos productos y se descuenta el stock. ¿Confirmar el pedido?' : '¿Confirmar este pedido?', 'Sí, confirmar', () => upd({ estado: st }));
-    if (st === 'rechazado') return ask('¿Rechazar este pedido? El cliente verá que fue rechazado.', 'Sí, rechazar', () => upd({ estado: st }));
-    ask('¿Marcar el pedido en revisión?', 'Sí', () => upd({ estado: st }));
-  }));
-  if ($('#gnv')) $('#gnv').onclick = () => ask('Se creará la nota de venta en Bsale y se descontará el stock.', 'Sí, crear nota de venta', () => api('POST', '/api/pedidos/' + o.id + '/nota-venta', {}));
-  if ($('#sn')) $('#sn').onclick = async () => { try { await upd({ notaInterna: $('#ni').value }); $('#m').innerHTML = '<div class="msg o">Nota guardada</div>'; } catch (e) { fail(e); } };
-  if ($('#cx')) $('#cx').onclick = () => ask('¿Cancelar este pedido?', 'Sí, cancelar', () => api('POST', '/api/pedidos/' + o.id + '/cancelar', {}));
+  const upd = async (body) => { try { await api('PATCH', '/api/pedidos/' + o.id, body); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
+  document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => upd({ estado: b.dataset.st })));
+  if ($('#sn')) $('#sn').onclick = () => upd({ notaInterna: $('#ni').value });
+  if ($('#cx')) $('#cx').onclick = async () => { if (!confirm('¿Cancelar este pedido?')) return; try { await api('POST', '/api/pedidos/' + o.id + '/cancelar', {}); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
 }
 
 /* ---- administración ---- */

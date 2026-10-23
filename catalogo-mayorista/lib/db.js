@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS products (
   pcd text NOT NULL DEFAULT '',
   et text NOT NULL DEFAULT '',
   price double precision NOT NULL DEFAULT 0,
-  net double precision NOT NULL DEFAULT 0,
   stock int NOT NULL DEFAULT 0,
   hidden boolean NOT NULL DEFAULT false,
   synced_at timestamptz NOT NULL DEFAULT now()
@@ -62,11 +61,6 @@ CREATE TABLE IF NOT EXISTS orders (
   notes text NOT NULL DEFAULT '',
   internal_note text NOT NULL DEFAULT '',
   customer jsonb NOT NULL,
-  bsale_id int,
-  bsale_number text NOT NULL DEFAULT '',
-  bsale_url text NOT NULL DEFAULT '',
-  bsale_error text NOT NULL DEFAULT '',
-  confirmed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -76,30 +70,14 @@ CREATE TABLE IF NOT EXISTS order_items (
   sku text NOT NULL,
   name text NOT NULL,
   qty int NOT NULL,
-  price double precision NOT NULL DEFAULT 0,
-  net double precision NOT NULL DEFAULT 0,
-  variant_id int
+  price double precision NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS kv (
   k text PRIMARY KEY,
   v jsonb NOT NULL
 );`;
 
-// Columnas agregadas después de la primera versión (para bases que ya existían)
-const MIGRATIONS = [
-  'ALTER TABLE products ADD COLUMN IF NOT EXISTS net double precision NOT NULL DEFAULT 0',
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS bsale_id int',
-  "ALTER TABLE orders ADD COLUMN IF NOT EXISTS bsale_number text NOT NULL DEFAULT ''",
-  "ALTER TABLE orders ADD COLUMN IF NOT EXISTS bsale_url text NOT NULL DEFAULT ''",
-  "ALTER TABLE orders ADD COLUMN IF NOT EXISTS bsale_error text NOT NULL DEFAULT ''",
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at timestamptz',
-  'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS net double precision NOT NULL DEFAULT 0',
-  'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id int',
-];
-async function init(pool) {
-  await pool.query(SCHEMA);
-  for (const m of MIGRATIONS) await pool.query(m);
-}
+async function init(pool) { await pool.query(SCHEMA); }
 
 // Transacción en una sola conexión (pool.query puede usar conexiones distintas)
 async function withTx(pool, fn) {

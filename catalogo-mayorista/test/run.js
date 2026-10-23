@@ -22,23 +22,10 @@ const page = (all, url) => {
   return { count: all.length, limit: lim, offset: off, items, next: off + lim < all.length ? 'x' : undefined };
 };
 const state = { talca: { 1: 5, 2: 2, 3: 0, 5: 0 }, bodega: { 1: 2, 2: 0, 3: 0, 4: 7, 5: 0 } }; // en juegos: cada variante de Bsale ya es el juego x4 // 4: sin precio
-const nvLog = { clients: [], docs: [], failDoc: false, known: new Set() };
-function fakeBsale(url, init) {
+function fakeBsale(url) {
   const p = new URL(url).pathname.replace('/v1', '');
-  if (init && init.method === 'POST') {
-    const b = JSON.parse(init.body);
-    if (p === '/clients.json') { nvLog.clients.push(b); nvLog.known.add(b.code); return { ok: true, status: 200, json: async () => ({ id: 700 }) }; }
-    if (p === '/documents.json') {
-      if (nvLog.failDoc) return { ok: false, status: 400, json: async () => ({ error: 'documento rechazado' }) };
-      nvLog.docs.push(b); b.details.forEach((d) => { state.talca[d.variantId] -= d.quantity; }); // Bsale descuenta el stock
-      const n = nvLog.docs.length; return { ok: true, status: 200, json: async () => ({ id: 9000 + n, number: 5000 + n, urlPublicView: 'https://app.bsale.io/doc/' + n }) };
-    }
-    throw new Error('POST no simulado ' + p);
-  }
   const stocks = (m, oid) => Object.entries(m).map(([v, q]) => ({ quantity: q, quantityAvailable: q, variant: { id: Number(v) }, office: { id: oid } }));
   const body = (() => {
-    if (p === '/document_types.json') return page([{ id: 3, name: 'Factura electrónica', state: 0 }, { id: 11, name: 'Nota de Venta', state: 0 }], url);
-    if (p === '/clients.json') { const c = new URL(url).searchParams.get('code'); return page(nvLog.known.has(c) ? [{ id: 700, code: c }] : [], url); }
     if (p === '/offices.json') return page([{ id: 1, name: 'Talca' }, { id: 2, name: 'Bodega Adicional' }, { id: 3, name: 'Casa Matriz' }], url);
     if (p === '/stocks.json') { const o = new URL(url).searchParams.get('officeid'); return page(o === '1' ? stocks(state.talca, 1) : o === '2' ? stocks(state.bodega, 2) : stocks({ 1: 999 }, 3), url); }
     if (p === '/price_lists.json') return page([{ id: 7, name: 'Minorista', state: 0 }, { id: 9, name: 'Lista Mayorista', state: 0 }], url);
@@ -58,7 +45,7 @@ function fakeBsale(url, init) {
   return { ok: true, status: 200, json: async () => body };
 }
 const bsale = {
-  client: makeClient({ token: 't', pauseMs: 0, fetchImpl: async (url, init) => fakeBsale(url, init) }),
+  client: makeClient({ token: 't', pauseMs: 0, fetchImpl: async (url) => fakeBsale(url) }),
   opts: { offices: ['talca', 'bodega adicional'], priceListName: 'mayorista', priceMode: 'iva' },
 };
 const drive = {
@@ -228,41 +215,6 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   // desactivar usuario
   await call(A, 'PATCH', '/api/admin/usuarios/' + (await pool.query("SELECT id FROM users WHERE email='m2@x.cl'")).rows[0].id, { activo: false });
   ok((await call(M2, 'GET', '/api/me')).s === 401, 'usuario desactivado pierde el acceso');
-
-  // ---- nota de venta en Bsale al confirmar ----
-  const o0 = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-205', qty: 1 }] });
-  ok(o0.s === 200, 'pedido para confirmar sin nota de venta');
-  const c0 = await call(V1b, 'PATCH', '/api/pedidos/' + o0.j.pedido.id, { estado: 'confirmado' });
-  ok(c0.s === 200 && c0.j.pedido.estado === 'confirmado' && !c0.j.pedido.notaVenta.id && nvLog.docs.length === 0, 'con la nota de venta apagada (BSALE_NV) solo confirma, sin tocar Bsale');
-  app.setSources({ bsale: Object.assign({}, bsale, { opts: Object.assign({}, bsale.opts, { nv: { office: 'talca', docTypeName: 'nota de venta' } }) }) });
-  ok((await call(V1b, 'GET', '/api/me')).j.notaVenta === true, 'el vendedor sabe que se creará nota de venta');
-  const max0 = (await call(M1, 'GET', '/api/productos?q=AB-205')).j.items[0].max;
-  const o3 = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-205', qty: 2 }] });
-  const id3 = o3.j.pedido.id;
-  ok((await call(M1, 'PATCH', '/api/pedidos/' + id3, { estado: 'confirmado' })).s === 403, 'el cliente no puede confirmar su pedido');
-  ok((await call(V2b, 'PATCH', '/api/pedidos/' + id3, { estado: 'confirmado' })).s === 404 && nvLog.docs.length === 0, 'otro vendedor no puede confirmar ni crear la nota');
-  const cf = await call(V1b, 'PATCH', '/api/pedidos/' + id3, { estado: 'confirmado' });
-  ok(cf.s === 200 && cf.j.pedido.estado === 'confirmado' && cf.j.pedido.notaVenta.numero === '5001' && cf.j.pedido.notaVenta.url.includes('bsale'), 'al confirmar crea la nota de venta y guarda su número');
-  const d = nvLog.docs[0];
-  ok(d.documentTypeId === 11 && d.officeId === 1 && d.clientId === 700 && d.details.length === 1 && d.details[0].variantId === 1 && d.details[0].quantity === 2 && d.details[0].netUnitValue === 50000 && d.details[0].comment === 'Pedido P-' + String(id3).padStart(5, '0'), 'documento: tipo Nota de Venta, sucursal Talca, cliente, variante, cantidad y precio neto');
-  ok(nvLog.clients.length === 1 && nvLog.clients[0].code === '76086428-5' && nvLog.clients[0].company === 'Neumáticos Sur SpA' && nvLog.clients[0].municipality === 'Talca', 'crea al cliente en Bsale con sus datos de facturación (RUT sin puntos)');
-  ok((await call(V1b, 'PATCH', '/api/pedidos/' + id3, { estado: 'confirmado' })).s === 200 && nvLog.docs.length === 1, 'confirmar de nuevo no duplica la nota de venta');
-  ok((await call(M1, 'GET', '/api/productos?q=AB-205')).j.items[0].max === max0 - 2, 'tras confirmar, el stock sigue apartado hasta que la sincronización lo refleje');
-  await new Promise((r) => setTimeout(r, 2800)); // la plataforma sincroniza sola después de crear la nota
-  ok((await call(M1, 'GET', '/api/productos?q=AB-205')).j.items[0].max === max0 - 2, 'tras sincronizar, Bsale ya descontó y el tope queda igual (sin descontar dos veces)');
-  // falla de Bsale: el pedido no queda confirmado y se puede reintentar
-  const o4 = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-205', qty: 1 }] }); const id4 = o4.j.pedido.id;
-  nvLog.failDoc = true;
-  const bad2 = await call(V1b, 'PATCH', '/api/pedidos/' + id4, { estado: 'confirmado' });
-  const after = (await call(V1b, 'GET', '/api/pedidos/' + id4)).j.pedido;
-  ok(bad2.s === 502 && bad2.j.error.includes('documento rechazado') && after.estado === 'nuevo' && after.notaVenta.error.includes('Bsale') && !after.notaVenta.id, 'si Bsale rechaza, el pedido NO queda confirmado y se muestra el error');
-  nvLog.failDoc = false;
-  const retry = await call(V1b, 'PATCH', '/api/pedidos/' + id4, { estado: 'confirmado' });
-  ok(retry.s === 200 && retry.j.pedido.notaVenta.numero === '5002' && !retry.j.pedido.notaVenta.error && nvLog.docs.length === 2, 'al reintentar crea la nota y limpia el error');
-  // pedido confirmado antes de activar la nota: se genera después
-  const gen = await call(V1b, 'POST', '/api/pedidos/' + o0.j.pedido.id + '/nota-venta', {});
-  ok(gen.s === 200 && gen.j.pedido.notaVenta.numero === '5003', 'se puede generar la nota de un pedido ya confirmado');
-  ok((await call(M1, 'POST', '/api/pedidos/' + o0.j.pedido.id + '/nota-venta', {})).s === 403, 'el cliente no genera notas de venta');
 
   srv.close(); await pool.end();
   console.log(fails ? '\n' + fails + ' prueba(s) fallaron' : '\nTodo bien');
