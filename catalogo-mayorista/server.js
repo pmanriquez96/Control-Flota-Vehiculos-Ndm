@@ -223,10 +223,19 @@ function createApp(pool, opts = {}) {
     pend.forEach((o) => {
       const lineas = o.items.map((i) => {
         const s = st.get(i.sku) || { stock_talca: 0, stock_bodega: 0 };
-        const trasladar = Math.max(0, i.qty - s.stock_talca);
-        return { sku: i.sku, nombre: i.name, pedido: i.qty, talca: s.stock_talca, bodega: s.stock_bodega, trasladar, faltante: Math.max(0, trasladar - s.stock_bodega) };
+        // Talca debe poder atender el pedido y quedar con al menos MIN_TALCA de ese SKU
+        const paraPedido = Math.max(0, i.qty - s.stock_talca);
+        const necesario = Math.max(0, i.qty + MIN_TALCA - s.stock_talca);
+        const mover = Math.min(necesario, s.stock_bodega);
+        const movPedido = Math.min(paraPedido, s.stock_bodega);
+        return {
+          sku: i.sku, nombre: i.name, pedido: i.qty, talca: s.stock_talca, bodega: s.stock_bodega,
+          paraPedido: movPedido, reserva: mover - movPedido, trasladar: mover,
+          faltante: paraPedido - movPedido,                       // el pedido no se puede atender con lo que hay
+          faltanteReserva: (necesario - paraPedido) - (mover - movPedido), // Bodega no alcanza para dejar el mínimo en Talca
+        };
       });
-      o.traslado = { lineas, total: lineas.reduce((n, l) => n + l.trasladar, 0), faltante: lineas.reduce((n, l) => n + l.faltante, 0) };
+      o.traslado = { lineas, minimo: MIN_TALCA, total: lineas.reduce((n, l) => n + l.trasladar, 0), faltante: lineas.reduce((n, l) => n + l.faltante, 0), faltanteReserva: lineas.reduce((n, l) => n + l.faltanteReserva, 0) };
     });
     return orders;
   }

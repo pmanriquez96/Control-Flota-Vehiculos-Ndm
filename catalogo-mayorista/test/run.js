@@ -242,10 +242,11 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok(!(await call(A, 'GET', '/api/admin/traslados')).j.items.some((i) => i.sku === 'AB-265' && i.mover > 0 && i.paraMinimo > 0 && i.talca >= i.pedidos + 1), 'no pide traslado donde Talca ya tiene lo suficiente');
   const pa = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 2 }] });
   const dA = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido;
-  ok(dA.traslado.total === 2 && dA.traslado.faltante === 0 && dA.traslado.lineas[0].talca === 0 && dA.traslado.lineas[0].bodega === 3 && dA.traslado.lineas[0].trasladar === 2, 'el pedido avisa cuánto trasladar: pide 2, Talca tiene 0 -> trasladar 2 desde Bodega Adicional');
+  const dl = dA.traslado.lineas[0];
+  ok(dA.traslado.total === 3 && dA.traslado.faltante === 0 && dA.traslado.faltanteReserva === 0 && dl.talca === 0 && dl.bodega === 3 && dl.paraPedido === 2 && dl.reserva === 1 && dl.trasladar === 3, 'el pedido avisa cuánto trasladar: pide 2 + 1 de reserva en Talca (Talca 0) = 3 desde Bodega Adicional');
   ok((await call(M1, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado === undefined, 'el cliente no ve el aviso de traslado');
   const lista = (await call(V1b, 'GET', '/api/pedidos')).j.items.find((o) => o.id === pa.j.pedido.id);
-  ok(lista.traslado.total === 2, 'la lista de pedidos también marca el traslado');
+  ok(lista.traslado.total === 3, 'la lista de pedidos también marca el traslado');
   t0 = await row();
   ok(t0.pedidos === 2 && t0.paraPedidos === 2 && t0.paraMinimo === 1 && t0.mover === 3 && t0.faltantePedidos === 0 && t0.codigos.length === 1, 'con 2 en pedidos: trasladar 2 + 1 de reserva en Talca = 3 (Bodega tiene 3)');
   await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 1 }] });
@@ -258,7 +259,11 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   t0 = await row();
   ok(t0.paraPedidos === 0 && t0.faltantePedidos === 0 && t0.faltanteMinimo === 1 && t0.mover === 0, 'si Bodega queda en 0 y Talca justo alcanza para los pedidos, avisa que falta reserva');
   const dB = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido;
-  ok(dB.traslado.total === 0, 'con Talca suficiente el pedido ya no pide traslado');
+  ok(dB.traslado.total === 0 && dB.traslado.faltante === 0, 'con Talca suficiente (pedido + 1 de reserva) ya no pide traslado');
+  state.talca[3] = 2; state.bodega[3] = 0; await app.doSync(false); // Talca justo para el pedido, sin reserva ni Bodega
+  const dC = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado;
+  ok(dC.total === 0 && dC.faltante === 0 && dC.faltanteReserva === 1 && dC.lineas[0].reserva === 0, 'si Talca alcanza para el pedido pero no queda 1 de reserva y Bodega no tiene: avisa solo lo de la reserva');
+  state.talca[3] = 3; await app.doSync(false);
   const resTr = (await call(A, 'GET', '/api/admin/traslados')).j;
   ok(resTr.minimo === 1 && resTr.resumen.juegos === resTr.items.reduce((n, i) => n + i.mover, 0), 'resumen de traslados coherente');
 
