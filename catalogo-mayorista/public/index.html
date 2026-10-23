@@ -3,18 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0f3d6e">
+<meta name="theme-color" content="#ffffff"><link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
 <title>Catálogo mayorista</title>
 <style>
-:root{--az:#0f3d6e;--az2:#1b5ea8;--bg:#f2f5f9;--card:#fff;--tx:#17212b;--mut:#64707d;--bd:#d9e0e8;--ok:#1a7f45;--warn:#b26a00;--mal:#c0392b;--rad:12px}
+/* Colores del logo de Neumáticos del Maule: verde azulado, grafito y blanco */
+:root{--az:#0a6165;--az2:#0a6165;--azd:#084a4d;--soft:#e4f1f1;--bg:#fff;--card:#fff;--tx:#1d2b2e;--mut:#5d6f72;--bd:#d6e2e3;--ok:#1a7f45;--warn:#b26a00;--mal:#c0392b;--rad:12px}
 [hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
-header{background:var(--az);color:#fff;position:sticky;top:0;z-index:20}
+header{background:#fff;color:var(--tx);position:sticky;top:0;z-index:20;border-bottom:3px solid var(--az);box-shadow:0 2px 8px #0a61651a}
 .hd{display:flex;align-items:center;gap:10px;padding:10px 14px;max-width:1100px;margin:auto}
-.hd b{font-size:17px;flex:1}.hd small{opacity:.8;display:block;font-weight:400;font-size:12px}
+.hd{gap:14px}.hd .logo img{height:40px;width:auto;display:block}.hd .ttl{font-size:16px;font-weight:600;color:var(--az);flex:1;padding-left:14px;border-left:2px solid var(--bd)}
+@media(max-width:560px){.hd .logo img{height:30px}.hd .ttl{display:none}.hd{flex-wrap:nowrap}.hd #who{display:none}.hd #out{margin-left:auto}}
+.biglogo{display:block;width:min(260px,80%);margin:0 auto 10px}
 nav{display:flex;gap:4px;overflow-x:auto;padding:0 10px 8px;max-width:1100px;margin:auto}
-nav a{color:#fff;opacity:.85;text-decoration:none;padding:7px 12px;border-radius:20px;white-space:nowrap;font-size:15px}
-nav a.on{background:#ffffff26;opacity:1;font-weight:600}nav a i{font-style:normal;background:#f5b301;color:#222;border-radius:10px;padding:0 7px;margin-left:5px;font-size:12px}
-main{max-width:1100px;margin:auto;padding:14px}
+nav a{color:var(--az);text-decoration:none;padding:7px 12px;border-radius:20px;white-space:nowrap;font-size:15px;font-weight:500}nav a:hover{background:var(--soft)}
+nav a.on{background:var(--az);color:#fff;font-weight:600}nav a i{font-style:normal;background:var(--tx);color:#fff;border-radius:10px;padding:0 7px;margin-left:5px;font-size:12px}nav a.on i{background:#fff;color:var(--az)}
+a{color:var(--az)}main{max-width:1100px;margin:auto;padding:14px}
 h1{font-size:21px;margin:6px 0 12px}h2{font-size:17px;margin:0 0 10px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:var(--rad);padding:14px;margin-bottom:12px}
 label{display:block;font-size:14px;color:var(--mut);margin:10px 0 3px}
@@ -23,12 +26,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--az2);border-colo
 .bad input,.bad select{border-color:var(--mal)}.err{color:var(--mal);font-size:13px;margin-top:3px}
 .row{display:grid;gap:10px}@media(min-width:640px){.row.c2{grid-template-columns:1fr 1fr}.row.c3{grid-template-columns:1fr 1fr 1fr}}
 button,.btn{font:inherit;border:0;border-radius:10px;padding:11px 16px;background:var(--az2);color:#fff;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;text-align:center}
-button.sec,.btn.sec{background:#e6edf5;color:var(--az)}button.mal{background:var(--mal)}button.wa,.btn.wa{background:#1fa855}button:disabled{opacity:.5}
+button:hover:not(:disabled),.btn:hover{background:var(--azd)}button.sec:hover:not(:disabled),.btn.sec:hover{background:#d3e6e7}button.sec,.btn.sec{background:var(--soft);color:var(--az)}button.mal{background:var(--mal)}button.wa,.btn.wa{background:#1fa855}button:disabled{opacity:.5}
 button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.msg{padding:10px 12px;border-radius:9px;margin:10px 0;font-size:15px}.msg.e{background:#fdecea;color:#8d2418}.msg.o{background:#e6f5ec;color:#145c32}.msg.i{background:#e8f0fb;color:#173f73}
+.msg{padding:10px 12px;border-radius:9px;margin:10px 0;font-size:15px}.msg.e{background:#fdecea;color:#8d2418}.msg.o{background:#e6f5ec;color:#145c32}.msg.i{background:var(--soft);color:var(--azd)}
 .grid{display:flex;flex-direction:column;gap:12px}
 .prod{background:#fff;border:1px solid var(--bd);border-radius:var(--rad);overflow:hidden;display:flex;flex-direction:column}
-.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#e9eef4}
+.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:0;background:#fff;align-content:center}.fotos .ph{border-right:1px solid var(--bd)}.fotos .ph:last-child{border-right:0}
 .fotos .ph{aspect-ratio:4/3;background:#fff;overflow:hidden;cursor:zoom-in}.fotos img{width:100%;height:100%;object-fit:contain;display:block}
 .fotos .nof{grid-column:1/-1;display:grid;place-items:center;aspect-ratio:12/3;color:var(--mut);font-size:14px}
 .zoom{position:fixed;inset:0;background:#000d;z-index:50;display:grid;place-items:center;padding:16px;cursor:zoom-out}.zoom img{max-width:100%;max-height:100%;background:#fff;border-radius:8px}
@@ -36,13 +39,13 @@ button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:
 .pb{padding:10px 12px;display:flex;flex-direction:column;gap:5px;flex:1}.pb .sku{font-size:12px;color:var(--mut)}.pb .nm{font-weight:600;font-size:15px}
 .pb .pr{font-size:20px;font-weight:700;color:var(--az)}.pb .pr small{font-size:12px;color:var(--mut);font-weight:400}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
-.chip{background:#e6edf5;color:var(--az);padding:7px 13px;border-radius:20px;white-space:nowrap;font-size:15px}.chip i{font-style:normal;opacity:.7;font-size:12px;margin-left:3px}.chip.on{background:var(--az);color:#fff}
+.chip{background:var(--soft);color:var(--az);padding:7px 13px;border-radius:20px;white-space:nowrap;font-size:15px}.chip i{font-style:normal;opacity:.7;font-size:12px;margin-left:3px}.chip.on{background:var(--az);color:#fff}
 .aro-h{font-size:19px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--az2);color:var(--az);display:flex;align-items:baseline;gap:10px}.aro-h small{font-size:13px;color:var(--mut);font-weight:400}
-.specs{display:flex;gap:5px;flex-wrap:wrap}.specs em{font-style:normal;font-size:12px;background:#eef2f7;color:#34506f;border-radius:6px;padding:2px 7px}
+.specs{display:flex;gap:5px;flex-wrap:wrap}.specs em{font-style:normal;font-size:12px;background:var(--soft);color:var(--azd);border-radius:6px;padding:2px 7px}
 .qty{display:flex;gap:6px;margin-top:auto}.qty input{width:70px;text-align:center}.qty button{flex:1}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:13px;color:var(--mut)}td.n,th.n{text-align:right;white-space:nowrap}
-.tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:600;background:#e6edf5;color:var(--az)}
-.tag.nuevo{background:#fff2d6;color:#8a5a00}.tag.revision{background:#e1ecfb;color:#154c93}.tag.confirmado{background:#dff3e7;color:#146c3a}.tag.rechazado,.tag.cancelado{background:#fde5e2;color:#9b2a1e}
+.tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:600;background:var(--soft);color:var(--az)}
+.tag.nuevo{background:#fff2d6;color:#8a5a00}.tag.revision{background:#dfe9ea;color:#1d4a54}.tag.confirmado{background:#dff3e7;color:#146c3a}.tag.rechazado,.tag.cancelado{background:#fde5e2;color:#9b2a1e}
 .pager{display:flex;gap:10px;justify-content:center;align-items:center;margin:14px 0}
 .cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--az);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:15;box-shadow:0 -2px 10px #0003}
 .cartbar b{flex:1}.cartbar a{background:#fff;color:var(--az);padding:9px 16px;border-radius:10px;font-weight:700;text-decoration:none}
@@ -53,7 +56,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:8px 6px;b
 </style>
 </head>
 <body>
-<header><div class="hd"><b id="ttl">Catálogo mayorista<small id="sub"></small></b><span id="who" class="hide-s" style="font-size:14px;opacity:.9"></span><button class="sec sm" id="out" hidden>Salir</button></div><nav id="nav"></nav></header>
+<header><div class="hd"><a class="logo" href="#/"><img src="logo.png" alt="Neumáticos del Maule"></a><span class="ttl">Catálogo mayorista</span><span id="who" style="font-size:14px;color:var(--mut)"></span><button class="sec sm" id="out" hidden>Salir</button></div><nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="bar"></div>
 <script>
@@ -82,8 +85,8 @@ const cartCount = () => Object.values(cartGet()).reduce((s, i) => s + i.qty, 0);
 
 /* ---- estructura ---- */
 function chrome() {
-  $('#sub').textContent = ME ? ME.empresa : '';
   $('#who').textContent = ME ? ME.nombre : '';
+  $('header').hidden = !ME; // en el ingreso se ve el logo grande en la tarjeta
   $('#out').hidden = !ME;
   const nav = $('#nav');
   if (!ME || ME.cambiarClave || (ME.rol === 'mayorista' && !ME.perfilCompleto)) { nav.innerHTML = ''; $('#bar').innerHTML = ''; return; }
@@ -125,7 +128,7 @@ $('#out').onclick = async () => { await api('POST', '/api/logout', {}).catch(() 
 
 /* ---- login ---- */
 function vLogin() {
-  $('#app').innerHTML = `<div class="card login"><h1>Ingresar</h1><p class="mut">Usa el correo y la clave que te entregó la empresa.</p>
+  $('#app').innerHTML = `<div class="card login"><img class="biglogo" src="logo.png" alt="Neumáticos del Maule"><h1>Ingresar</h1><p class="mut">Usa el correo y la clave que te entregó la empresa.</p>
   <form id="f"><label>Correo</label><input name="email" type="email" autocomplete="username" required><label>Clave</label><input name="password" type="password" autocomplete="current-password" required>
   <div id="m"></div><p><button style="width:100%">Entrar</button></p></form></div>`;
   $('#f').onsubmit = async (e) => {
