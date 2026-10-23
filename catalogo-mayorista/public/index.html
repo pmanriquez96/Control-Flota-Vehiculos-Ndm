@@ -189,6 +189,7 @@ async function vPerfil(primera) {
 
 /* ---- catálogo ---- */
 const CAT = { q: '', cat: '', aro: '', pcd: '', pagina: 1 };
+let LIMIT_MSG = {}; // aviso al pasarse de lo disponible (sin mostrar cantidades)
 const aroTxt = (a) => (a ? 'Aro ' + a + '"' : 'Otras medidas');
 async function vCatalogo() {
   const app = $('#app');
@@ -212,7 +213,7 @@ async function vCatalogo() {
     return `<div class="prod"><div class="fotos">${p.fotos.length ? p.fotos.map((u) => `<div class="ph"><img loading="lazy" src="${esc(u)}" alt="${esc(p.nombre)}"></div>`).join('') : '<div class="nof">Sin foto</div>'}</div>
     <div class="pb"><span class="sku">SKU ${esc(p.sku)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span><span class="nm">${esc(p.nombre)}</span>${specs.length ? `<span class="specs">${specs.map((x) => `<em>${esc(x)}</em>`).join('')}</span>` : ''}
     <span class="pr">${clp(p.precio)} <small>IVA incluido · juego de ${ME.juego}</small></span>
-    ${buy ? (left > 0 ? `<span class="mut" style="font-size:12px;margin-top:6px">Cantidad de juegos (hasta ${left})</span><div class="qty"><input type="number" inputmode="numeric" min="1" max="${left}" value="1" aria-label="Cantidad de juegos" title="Cantidad de juegos"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} juego${inCart > 1 ? 's' : ''} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible</span>') : `<span class="stk"><em class="${p.stockTalca ? '' : 'z'}">Talca: <b>${p.stockTalca}</b></em><em>Bodega Adicional: <b>${p.stockBodega}</b></em></span><span class="mut" style="font-size:13px">Disponible para pedir: ${p.max} juego${p.max > 1 ? 's' : ''}</span>`}</div></div>`;
+    ${buy ? (left > 0 ? `<span class="mut" style="font-size:12px;margin-top:6px">Cantidad de juegos</span><div class="qty"><input type="number" inputmode="numeric" min="1" value="1" aria-label="Cantidad de juegos" title="Cantidad de juegos"><button data-add="${esc(p.sku)}" data-max="${p.max}" data-n="${esc(p.nombre)}" data-p="${p.precio}">Agregar</button></div>${inCart ? `<span class="mut" style="font-size:13px">${inCart} juego${inCart > 1 ? 's' : ''} en tu pedido</span>` : ''}` : '<span class="mut">Ya agregaste todo lo disponible de este modelo</span>') + (LIMIT_MSG[p.sku] ? `<span class="err">${esc(LIMIT_MSG[p.sku])}</span>` : '') : `<span class="stk"><em class="${p.stockTalca ? '' : 'z'}">Talca: <b>${p.stockTalca}</b></em><em>Bodega Adicional: <b>${p.stockBodega}</b></em></span><span class="mut" style="font-size:13px">Disponible para pedir: ${p.max} juego${p.max > 1 ? 's' : ''}</span>`}</div></div>`;
   };
   // Separado por diámetro de aro: un encabezado por cada aro
   const groups = []; r.items.forEach((p) => { let g = groups[groups.length - 1]; if (!g || g.aro !== p.aro) { g = { aro: p.aro, items: [] }; groups.push(g); } g.items.push(p); });
@@ -227,8 +228,9 @@ async function vCatalogo() {
     const input = b.parentNode.querySelector('input'), c = cartGet(), sku = b.dataset.add, max = Number(b.dataset.max);
     let n = Math.floor(Number(input.value)); if (!(n >= 1)) n = 1;
     const cur = (c[sku] || {}).qty || 0;
-    if (cur + n > max) { n = max - cur; alert('Solo puedes pedir hasta ' + max + ' juegos de este producto.'); }
-    if (n < 1) return;
+    LIMIT_MSG = {};
+    if (cur + n > max) { n = max - cur; LIMIT_MSG[sku] = n < 1 ? 'No hay más disponibles de este modelo.' : 'No hay tanta cantidad disponible: agregamos el máximo posible.'; }
+    if (n < 1) return vCatalogo();
     c[sku] = { qty: cur + n, nombre: b.dataset.n, precio: Number(b.dataset.p), max }; cartSet(c); chrome(); vCatalogo();
   }));
 }
@@ -239,7 +241,7 @@ function vCarrito() {
   if (!skus.length) { $('#app').innerHTML = '<h1>Mi pedido</h1><div class="card mut">Aún no agregas productos. <a href="#/">Ir al catálogo</a></div>'; return; }
   const total = skus.reduce((s, k) => s + c[k].qty * c[k].precio, 0);
   $('#app').innerHTML = `<h1>Mi pedido</h1><div class="card"><table><tr><th>SKU / Producto</th><th class="n">Juegos</th><th class="n hide-s">Subtotal</th><th></th></tr>
-  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} por juego de ${ME.juego} · IVA incl.</span></td><td class="n"><input type="number" inputmode="numeric" min="1" max="${c[k].max}" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
+  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} por juego de ${ME.juego} · IVA incl.</span></td><td class="n"><input type="number" inputmode="numeric" min="1" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
   <tr><td colspan="2" class="n"><b>Total referencial (IVA incluido)</b></td><td class="n hide-s"><b>${clp(total)}</b></td><td></td></tr></table>
   <p class="mut" style="font-size:14px">Es un pedido previo: tu vendedor ${ME.vendedor ? '<b>' + esc(ME.vendedor.nombre) + '</b> ' : ''}lo revisa y lo confirma. Precios y disponibilidad pueden variar hasta entonces.</p>
   <label>Observaciones para tu vendedor (opcional)</label><textarea id="nt" rows="2" maxlength="500"></textarea><div id="m"></div>
@@ -258,7 +260,7 @@ function vCarrito() {
       b.disabled = false;
       let t = esc(e.message);
       if (e.data && e.data.problemas) {
-        t += '<ul>' + e.data.problemas.map((p) => `<li>${esc(p.nombre)}: ${p.max ? 'solo quedan ' + p.max : 'ya no está disponible'}</li>`).join('') + '</ul>';
+        t += '<ul>' + e.data.problemas.map((p) => `<li>${esc(p.nombre)}: ${p.max ? 'ya no hay esa cantidad disponible (ajustamos tu pedido)' : 'ya no está disponible (lo quitamos de tu pedido)'}</li>`).join('') + '</ul>';
         e.data.problemas.forEach((p) => { if (p.max) c[p.sku].max = p.max, c[p.sku].qty = Math.min(c[p.sku].qty, p.max); else delete c[p.sku]; }); cartSet(c);
       }
       $('#m').innerHTML = `<div class="msg e">${t}</div>`;
