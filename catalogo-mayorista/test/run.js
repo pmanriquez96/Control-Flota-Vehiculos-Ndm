@@ -26,7 +26,7 @@ function fakeBsale(url) {
   const p = new URL(url).pathname.replace('/v1', '');
   const stocks = (m, oid) => Object.entries(m).map(([v, q]) => ({ quantity: q, quantityAvailable: q, variant: { id: Number(v) }, office: { id: oid } }));
   const body = (() => {
-    if (p === '/offices.json') return page([{ id: 1, name: 'Talca' }, { id: 2, name: 'Bodega Adicional' }, { id: 3, name: 'Casa Matriz' }], url);
+    if (p === '/offices.json') return page([{ id: 1, name: 'Talca' }, { id: 2, name: 'Bodega Adicional' }, { id: 3, name: 'Casa Matriz' }, { id: 4, name: 'Talca Centro' }, { id: 5, name: 'Bodega Adicional Norte' }], url); // los dos últimos NO deben contarse
     if (p === '/stocks.json') { const o = new URL(url).searchParams.get('officeid'); return page(o === '1' ? stocks(state.talca, 1) : o === '2' ? stocks(state.bodega, 2) : stocks({ 1: 999 }, 3), url); }
     if (p === '/price_lists.json') return page([{ id: 7, name: 'Minorista', state: 0 }, { id: 9, name: 'Lista Mayorista', state: 0 }], url);
     if (p === '/price_lists/9/details.json') return page([
@@ -115,6 +115,15 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok(a.s === 200 && A, 'login administrador');
 
   // sincronización
+  // solo cuentan Talca y Bodega Adicional (exactas), aunque existan otras con nombres parecidos y mucho stock
+  const cat0 = await require('../lib/bsale').fetchCatalog(bsale.client, bsale.opts);
+  ok(cat0.offices.join() === 'Talca,Bodega Adicional' && cat0.items.find((i) => i.sku === 'AB-205').stock === 7, 'el stock suma solo Talca y Bodega Adicional (no "Talca Centro" ni "Bodega Adicional Norte")');
+  let amb = ''; try { await require('../lib/bsale').fetchCatalog(bsale.client, Object.assign({}, bsale.opts, { offices: ['bodega'] })); } catch (e) { amb = e.message; }
+  ok(amb.includes('coincide con varias'), 'un nombre de sucursal ambiguo se rechaza en vez de sumar de más');
+  state.talca[3] = -2; state.bodega[3] = 5;
+  const neg = (await require('../lib/bsale').fetchCatalog(bsale.client, bsale.opts)).items.find((i) => i.sku === 'AB-AGOTADO');
+  ok(neg.stock === 3 && neg.stockTalca === 0 && neg.stockBodega === 5, 'con saldo negativo en Talca el total se descuenta (3), sin pasar de lo que existe');
+  state.talca[3] = 0; state.bodega[3] = 0;
   const sy = await app.doSync(true);
   ok(sy.ok && sy.productos === 5 && sy.conStock === 2 && sy.sucursales.length === 2 && sy.fotos === 4, 'sync: 5 productos, 2 visibles, 2 sucursales, 4 fotos ' + JSON.stringify(sy));
   const ap = (await call(A, 'GET', '/api/admin/productos')).j.items;

@@ -34,11 +34,17 @@ function makeClient({ token, fetchImpl, pauseMs } = {}) {
 }
 
 // "Talca,Bodega Adicional" -> coincide con el nombre de la sucursal sin importar tildes ni mayúsculas
+// Una sucursal por cada nombre pedido: coincidencia exacta; solo si no hay exacta, una que lo contenga.
+// Si un nombre calza con varias sucursales se detiene, para no sumar stock de sucursales que no corresponden.
 function pickOffices(offices, wanted) {
-  const w = wanted.map(norm).filter(Boolean);
-  return offices.filter((o) => w.some((x) => norm(o.name) === x) ).concat(
-    offices.filter((o) => !w.some((x) => norm(o.name) === x) && w.some((x) => norm(o.name).includes(x)))
-  );
+  const out = [];
+  for (const w of wanted.map(norm).filter(Boolean)) {
+    const exact = offices.filter((o) => norm(o.name) === w);
+    const hit = exact.length ? exact : offices.filter((o) => norm(o.name).includes(w));
+    if (hit.length > 1) throw new Error('El nombre de sucursal "' + w + '" coincide con varias (' + hit.map((o) => o.name).join(', ') + '). Escríbelo igual que en Bsale.');
+    if (hit[0] && !out.includes(hit[0])) out.push(hit[0]);
+  }
+  return out;
 }
 
 // Datos del rin que vienen en el nombre: "LLANTA ALEACION 16X7 5X114.3 ET40" -> aro 16, ancho 7, PCD 5x114.3, ET 40
@@ -82,7 +88,9 @@ async function fetchCatalog(client, opts) {
   // Se guarda por separado la sucursal principal (de donde se despacha y se emiten los documentos: Talca)
   // y el resto (Bodega Adicional); el catálogo usa la suma.
   const main = pickOffices(chosen, [opts.mainOffice || wantedOffices[0]])[0] || chosen[0];
-  const stock = new Map(), stockMain = new Map();
+  // Solo cuentan estas sucursales. El total es la suma real (un saldo negativo en una resta de la otra, para no vender de más);
+  // cada sucursal se muestra por separado sin negativos.
+  const stock = new Map(), stockMain = new Map(), stockOther = new Map();
   for (const o of chosen) {
     const rows = await client.all('/stocks.json?officeid=' + o.id);
     for (const s of rows) {
@@ -90,7 +98,8 @@ async function fetchCatalog(client, opts) {
       if (!vid) continue;
       const q = Number(s.quantityAvailable != null ? s.quantityAvailable : s.quantity) || 0;
       stock.set(vid, (stock.get(vid) || 0) + q);
-      if (o.id === main.id) stockMain.set(vid, (stockMain.get(vid) || 0) + q);
+      const m = o.id === main.id ? stockMain : stockOther;
+      m.set(vid, (m.get(vid) || 0) + q);
     }
   }
 
@@ -132,9 +141,8 @@ async function fetchCatalog(client, opts) {
       price: price.get(v.id) || 0,
       stock: Math.max(0, Math.floor(stock.get(v.id) || 0)),
       stockTalca: Math.max(0, Math.floor(stockMain.get(v.id) || 0)),
+      stockBodega: Math.max(0, Math.floor(stockOther.get(v.id) || 0)),
     });
-    const it = items[items.length - 1];
-    it.stockBodega = Math.max(0, it.stock - it.stockTalca);
   }
   return { items, offices: chosen.map((o) => o.name), mainOffice: main.name, priceListId: plId };
 }
