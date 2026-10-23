@@ -17,6 +17,16 @@ function makeClient({ token, fetchImpl, pauseMs } = {}) {
       throw new Error('Bsale ' + r.status + ' en ' + path.split('?')[0]);
     }
   }
+  // Escritura (clientes y documentos). No se reintenta: un reintento podría duplicar el documento.
+  async function post(path, body) {
+    const r = await f(BASE + path, { method: 'POST', headers: { access_token: token, Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    let j = null; try { j = await r.json(); } catch (e) { /* sin cuerpo */ }
+    if (!r.ok) {
+      const det = j && (j.error || j.message || (j.errors && JSON.stringify(j.errors))) || '';
+      throw new Error('Bsale ' + r.status + ' en ' + path.split('?')[0] + (det ? ': ' + String(det).slice(0, 200) : ''));
+    }
+    return j;
+  }
   // Recorre todas las páginas (limit máx. 50)
   async function all(path, sep) {
     const out = [];
@@ -30,7 +40,7 @@ function makeClient({ token, fetchImpl, pauseMs } = {}) {
     }
     return out;
   }
-  return { get, all };
+  return { get, post, all };
 }
 
 // "Talca,Bodega Adicional" -> coincide con el nombre de la sucursal sin importar tildes ni mayúsculas
@@ -98,12 +108,13 @@ async function fetchCatalog(client, opts) {
     if (!hit) throw new Error('No encontré la lista de precios "' + priceListName + '". Disponibles: ' + lists.map((l) => l.name).join(', '));
     plId = hit.id;
   }
-  const price = new Map();
+  const price = new Map(), net = new Map();
   for (const d of await client.all('/price_lists/' + plId + '/details.json')) {
     const vid = d.variant && d.variant.id;
     if (!vid) continue;
     const p = priceMode === 'iva' ? d.variantValueWithTaxes : d.variantValue;
     price.set(vid, Number(p) || 0);
+    net.set(vid, Number(d.variantValue) || 0);
   }
 
   // 4) nombres (variantes activas con su producto) y tipo de producto como categoría
@@ -125,11 +136,61 @@ async function fetchCatalog(client, opts) {
     items.push({
       sku, variantId: v.id, name, category: types.get(typeId) || '',
       medida: pm.medida, aro: pm.aro, ancho: pm.ancho, pcd: pm.pcd, et: pm.et,
-      price: price.get(v.id) || 0,
+      price: price.get(v.id) || 0, net: net.get(v.id) || 0,
       stock: Math.max(0, Math.floor(stock.get(v.id) || 0)),
     });
   }
   return { items, offices: chosen.map((o) => o.name), priceListId: plId };
 }
 
-module.exports = { makeClient, fetchCatalog, pickOffices, parseRin, norm };
+/* ---- Nota de venta ----
+   order: { codigo, cliente (datos de facturación), items: [{ variantId, qty, net, sku }] }
+   nv:    { office: 'Talca', docTypeId?: n, docTypeName: 'Nota de venta', priceListId? }
+   Devuelve { id, number, url }. Los ids de sucursal y de tipo de documento se leen una vez de Bsale. */
+const cache = new Map();
+async function nvSetup(client, nv) {
+  const key = JSON.stringify([nv.office, nv.docTypeId, nv.docTypeName]);
+  if (cache.has(key)) return cache.get(key);
+  const offices = await client.all('/offices.json');
+  const office = pickOffices(offices, [nv.office])[0];
+  if (!office) throw new Error('No encontré la sucursal "' + nv.office + '" para emitir la nota de venta');
+  let docTypeId = nv.docTypeId;
+  if (!docTypeId) {
+    const types = await client.all('/document_types.json');
+    const hit = types.find((t) => t.state === 0 && norm(t.name).includes(norm(nv.docTypeName))) || types.find((t) => norm(t.name).includes(norm(nv.docTypeName)));
+    if (!hit) throw new Error('No encontré el tipo de documento "' + nv.docTypeName + '". Disponibles: ' + types.map((t) => t.name).join(', '));
+    docTypeId = hit.id;
+  }
+  const r = { officeId: office.id, docTypeId };
+  cache.set(key, r);
+  return r;
+}
+const rutBsale = (rut) => String(rut || '').replace(/\./g, ''); // "76086428-5"
+
+async function findOrCreateClient(client, c) {
+  const code = rutBsale(c.rut);
+  const j = await client.get('/clients.json?code=' + encodeURIComponent(code));
+  if (j && j.items && j.items[0]) return j.items[0].id;
+  const made = await client.post('/clients.json', {
+    code, company: c.razon_social, activity: c.giro, companyOrPerson: 1,
+    address: c.direccion, municipality: c.comuna, city: c.ciudad,
+    email: c.email_fact, phone: c.telefono || c.whatsapp,
+  });
+  return made.id;
+}
+
+async function createNotaVenta(client, nv, order) {
+  const { officeId, docTypeId } = await nvSetup(client, nv);
+  const clientId = await findOrCreateClient(client, order.cliente);
+  const now = Math.floor(Date.now() / 1000);
+  const doc = {
+    documentTypeId: docTypeId, officeId, emissionDate: now, expirationDate: now, declareSii: 0, clientId,
+    details: order.items.map((i) => ({ variantId: i.variantId, quantity: i.qty, netUnitValue: i.net, comment: 'Pedido ' + order.codigo })),
+  };
+  if (nv.priceListId) doc.priceListId = nv.priceListId;
+  const r = await client.post('/documents.json', doc);
+  if (!r || !r.id) throw new Error('Bsale no devolvió el documento creado');
+  return { id: r.id, number: r.number != null ? String(r.number) : '', url: r.urlPublicView || r.urlPdf || '' };
+}
+
+module.exports = { makeClient, fetchCatalog, pickOffices, parseRin, norm, createNotaVenta };

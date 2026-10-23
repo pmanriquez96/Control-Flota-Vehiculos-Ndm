@@ -14,6 +14,15 @@ Proyecto independiente (vive en esta carpeta para poder moverlo a su propio repo
   - *Administrador*: ve todo, crea usuarios, reasigna vendedores, oculta productos, ve el stock real y fuerza la sincronización.
 - **Pedido previo.** Carrito → «Enviar pedido» → resumen con SKU, nombre, cantidad y datos del cliente. Al terminar, el cliente decide si avisa a su vendedor por **WhatsApp** (botón que abre `wa.me` con el resumen ya escrito). El vendedor además ve el pedido (con contador de nuevos) en su panel.
 
+## Nota de venta en Bsale
+Cuando el vendedor o vendedora **confirma** un pedido, la plataforma crea la **nota de venta** en Bsale (si `BSALE_NV=on`): busca al cliente por RUT (lo crea con sus datos de facturación si no existe), emite el documento en la sucursal `BSALE_NV_OFFICE` con cada SKU, cantidad (juegos) y **precio neto** de la lista Mayorista, y guarda el N° en el pedido. Reglas:
+- Si Bsale rechaza el documento, el pedido **no queda confirmado**: se muestra el error y se puede reintentar sin duplicar (un pedido tiene como máximo una nota).
+- Una vez creada la nota, el pedido no se puede rechazar ni volver atrás desde la plataforma: se anula en Bsale.
+- Hasta que la sincronización refleje el descuento de stock de Bsale (se lanza sola unos segundos después), el pedido confirmado sigue apartado, para no vender dos veces.
+- Con `BSALE_NV` vacío, confirmar solo cambia el estado (no se toca Bsale). Es el valor por defecto para no emitir documentos por accidente.
+- El stock se descuenta de **una sola sucursal** (`BSALE_NV_OFFICE`), aunque el catálogo sume Talca + Bodega Adicional. Pendiente definir qué hacer si una sucursal no alcanza.
+- No se probó contra el Bsale real: los campos del documento siguen su documentación pública y hay que revisarlos con una primera nota de prueba.
+
 ## Variables de entorno
 
 Ver `.env.example`. Obligatorias en producción: `DATABASE_URL`, `SESSION_SECRET`, `BSALE_TOKEN`. Para crear el primer administrador: `ADMIN_EMAIL` + `ADMIN_PASSWORD` (solo funciona si no hay usuarios).
