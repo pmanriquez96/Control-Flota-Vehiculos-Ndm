@@ -5,7 +5,7 @@
   window.NDM_SERVER = true;
 
   /* Copia local de lo mínimo para abrir la página sin señal (vehículos, último km, nombres y usuario). */
-  var CACHEABLE = /^\/api\/(me|col\/(vehicles|kmlog)|doc\/settings\/personal)$/;
+  var CACHEABLE = /^\/api\/(me|col\/(vehicles|kmlog)|doc\/settings\/(personal|rutas))$/;
   function cget(u) { try { var s = localStorage.getItem('ndm_c:' + u); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
   function cput(u, j) { try { var s = JSON.stringify(j); if (s.length < 1500000) localStorage.setItem('ndm_c:' + u, s); } catch (e) {} }
   function cclear() { try { Object.keys(localStorage).filter(function (k) { return k.indexOf('ndm_c:') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {} }

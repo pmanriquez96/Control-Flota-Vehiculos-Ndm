@@ -79,7 +79,7 @@ function forChofer(col, id, data, alertas) {
     let last = null; ((data && data.entries) || []).forEach((x) => { if (!last || x.d >= last.d) last = x; });
     return { entries: last ? [last] : [] };
   }
-  if (col === 'settings' && id === 'personal') return data;
+  if (col === 'settings' && (id === 'personal' || id === 'rutas')) return data;
   return undefined;
 }
 /* Alertas activas por vehículo, en versión breve, para la pantalla del chofer. */
