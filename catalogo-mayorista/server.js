@@ -191,14 +191,23 @@ function createApp(pool, opts = {}) {
     const msg = `Hola ${seller.name}, soy ${c.contacto_nombre || c.razon_social}${c.razon_social ? ' (' + c.razon_social + ')' : ''}.\nAcabo de enviar el pedido ${order.codigo} en el catálogo:\n${lines}\nTotal referencial: ${clp(order.total)} IVA incluido.`;
     return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg);
   }
+  // Aviso del vendedor al cliente por WhatsApp (abre el chat con el resumen ya escrito)
+  function waLinkCliente(order, seller) {
+    const n = waNumber((order.cliente || {}).whatsapp);
+    if (!n) return '';
+    const c = order.cliente;
+    const lines = order.items.map((i) => `• ${i.sku} — ${i.name} × ${i.qty} ${i.qty === 1 ? 'juego' : 'juegos'}${i.original ? ' (antes ' + i.original + ')' : ''}`).join('\n');
+    const msg = `Hola ${c.contacto_nombre || c.razon_social}, soy ${seller.name} de ${empresa}.\nTe escribo por tu pedido ${order.codigo}${order.items.some((i) => i.original) ? ', que ajusté según la disponibilidad' : ''}:\n${lines}\nTotal referencial: ${clp(order.total)} IVA incluido.\n¿Me confirmas para continuar?`;
+    return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg);
+  }
   const code = (id) => 'P-' + String(id).padStart(5, '0');
   async function loadOrder(id) {
     const o = (await q('SELECT o.*, s.name AS seller_name, s.phone AS seller_phone FROM orders o LEFT JOIN users s ON s.id=o.seller_id WHERE o.id=$1', [id])).rows[0];
     if (!o) return null;
-    return shape(o, (await q('SELECT sku,name,qty,price FROM order_items WHERE order_id=$1 ORDER BY id', [id])).rows);
+    return shape(o, (await q('SELECT sku,name,qty,price,qty_orig FROM order_items WHERE order_id=$1 ORDER BY id', [id])).rows);
   }
   function shape(o, items) {
-    const its = items.map((i) => ({ sku: i.sku, name: i.name, qty: i.qty, precio: Math.round(i.price), subtotal: Math.round(i.price * i.qty) }));
+    const its = items.map((i) => ({ sku: i.sku, name: i.name, qty: i.qty, original: i.qty_orig != null && i.qty_orig !== i.qty ? i.qty_orig : null, precio: Math.round(i.price), subtotal: Math.round(i.price * i.qty) }));
     return {
       id: o.id, codigo: code(o.id), estado: o.estado, fecha: o.created_at, actualizado: o.updated_at, notas: o.notes, notaInterna: o.internal_note,
       cliente: o.customer, vendedor: { id: o.seller_id, nombre: o.seller_name, telefono: o.seller_phone },
@@ -220,7 +229,7 @@ function createApp(pool, opts = {}) {
     const rows = (await q(`SELECT o.*, s.name AS seller_name, s.phone AS seller_phone FROM orders o LEFT JOIN users s ON s.id=o.seller_id
                            ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''} ORDER BY o.id DESC LIMIT 300`, params)).rows;
     if (!rows.length) return [];
-    const its = (await q(`SELECT order_id,sku,name,qty,price FROM order_items WHERE order_id IN (${rows.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY id`, rows.map((r) => r.id))).rows;
+    const its = (await q(`SELECT order_id,sku,name,qty,price,qty_orig FROM order_items WHERE order_id IN (${rows.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY id`, rows.map((r) => r.id))).rows;
     return rows.map((o) => shape(o, its.filter((i) => i.order_id === o.id)));
   }
 
@@ -315,7 +324,66 @@ function createApp(pool, opts = {}) {
     const l = await addTraslados(req.user, await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]));
     if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
     const seller = { name: l[0].vendedor.nombre, phone: l[0].vendedor.telefono };
-    res.json({ pedido: l[0], whatsapp: req.user.role === 'mayorista' ? waLink(l[0], seller) : '' });
+    const eventos = (await q('SELECT who,text,created_at FROM order_events WHERE order_id=$1 ORDER BY id', [l[0].id])).rows.map((e) => ({ quien: e.who, texto: e.text, fecha: e.created_at }));
+    res.json({
+      pedido: Object.assign(l[0], { eventos }),
+      whatsapp: req.user.role === 'mayorista' ? waLink(l[0], seller) : '',
+      whatsappCliente: req.user.role === 'mayorista' ? '' : waLinkCliente(l[0], seller),
+    });
+  }));
+  // El vendedor (o el administrador) modifica la cantidad de juegos de un pedido nuevo o en revisión.
+  // Un producto en 0 se quita. No puede pasarse de lo que existe entre Talca y Bodega Adicional (sin contar lo que ya tiene este pedido apartado).
+  app.patch('/api/pedidos/:id/items', loadUser, gate, only('admin', 'vendedor'), wrap(async (req, res) => {
+    const l = await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]);
+    if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const o = l[0];
+    if (!PENDIENTES.includes(o.estado)) return res.status(409).json({ error: 'Solo se pueden modificar pedidos nuevos o en revisión' });
+    const changes = new Map();
+    for (const it of Array.isArray((req.body || {}).items) ? req.body.items : []) {
+      const sku = String(it && it.sku || '').trim().toUpperCase(), n = Number(it && it.qty);
+      if (!sku || !Number.isInteger(n) || n < 0 || n > MAX_QTY) return res.status(400).json({ error: 'Cantidad no válida en ' + (sku || 'un producto') });
+      changes.set(sku, n);
+    }
+    if (!changes.size) return res.status(400).json({ error: 'No hay cambios' });
+    const job = orderLock.then(async () => {
+      const cur = (await q('SELECT id,sku,name,qty,qty_orig FROM order_items WHERE order_id=$1 ORDER BY id', [o.id])).rows;
+      const resv = await reservedMap();
+      const prods = new Map((await q(`SELECT sku,price,stock,hidden FROM products WHERE sku IN (${[...changes.keys()].map((_, i) => '$' + (i + 1)).join(',')})`, [...changes.keys()])).rows.map((p) => [p.sku, p]));
+      const edits = [], problemas = [];
+      for (const [sku, n] of changes) {
+        const line = cur.find((x) => x.sku === sku);
+        if (!line) return { error: 'El producto ' + sku + ' no está en este pedido' };
+        if (n === line.qty) continue;
+        if (n > line.qty) {
+          const p = prods.get(sku);
+          const max = p && !p.hidden && p.price > 0 ? p.stock - ((resv.get(sku) || 0) - line.qty) : 0;
+          if (n > max) { problemas.push({ sku, max: Math.max(0, max) }); continue; }
+        }
+        edits.push({ line, n });
+      }
+      if (problemas.length) return { problemas };
+      if (!edits.length) return { error: 'No hay cambios' };
+      const left = cur.filter((x) => { const e = edits.find((d) => d.line.id === x.id); return (e ? e.n : x.qty) > 0; });
+      if (!left.length) return { error: 'El pedido debe quedar con al menos un producto. Para anularlo, recházalo.' };
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const { line, n } of edits) {
+          if (n === 0) await client.query('DELETE FROM order_items WHERE id=$1', [line.id]);
+          else await client.query('UPDATE order_items SET qty=$1, qty_orig=$2 WHERE id=$3', [n, line.qty_orig != null ? line.qty_orig : line.qty, line.id]);
+          const j = (k) => k + ' juego' + (k === 1 ? '' : 's');
+          await client.query('INSERT INTO order_events(order_id,who,text) VALUES($1,$2,$3)', [o.id, req.user.name, n === 0 ? `quitó ${line.sku} (el cliente pedía ${j(line.qty)})` : `cambió ${line.sku} de ${j(line.qty)} a ${j(n)}`]);
+        }
+        await client.query('UPDATE orders SET updated_at=now() WHERE id=$1', [o.id]);
+        await client.query('COMMIT');
+      } catch (e) { try { await client.query('ROLLBACK'); } catch (x) { /* nada */ } throw e; } finally { client.release(); }
+      return {};
+    });
+    orderLock = job.catch(() => {});
+    const r = await job;
+    if (r.problemas) return res.status(409).json({ error: 'No alcanza el stock: ' + r.problemas.map((p) => p.sku + ' admite hasta ' + p.max + ' juego' + (p.max === 1 ? '' : 's')).join(', '), problemas: r.problemas });
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.json({ ok: true, pedido: await loadOrder(o.id) });
   }));
   // Descarga del pedido en Excel (cada rol solo puede bajar los que ve)
   app.get('/api/pedidos/:id/excel', loadUser, gate, wrap(async (req, res) => {

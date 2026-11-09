@@ -261,7 +261,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok(lista.traslado.total === 3, 'la lista de pedidos también marca el traslado');
   t0 = await row();
   ok(t0.pedidos === 2 && t0.paraPedidos === 2 && t0.paraMinimo === 1 && t0.mover === 3 && t0.faltantePedidos === 0 && t0.codigos.length === 1, 'con 2 en pedidos: trasladar 2 + 1 de reserva en Talca = 3 (Bodega tiene 3)');
-  await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 1 }] });
+  const pb = await call(M1, 'POST', '/api/pedidos', { items: [{ sku: 'AB-AGOTADO', qty: 1 }] });
   t0 = await row();
   ok(t0.pedidos === 3 && t0.paraPedidos === 3 && t0.mover === 3 && t0.faltanteMinimo === 1 && t0.faltantePedidos === 0, 'con 3 en pedidos y solo 3 en Bodega: se priorizan los pedidos y falta 1 para la reserva de Talca');
   state.talca[3] = 2; state.bodega[3] = 1; await app.doSync(false); // se trasladaron 2
@@ -293,6 +293,26 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok((await call(V1b, 'POST', '/api/stock/actualizar', { skus: ['AB-AGOTADO'] })).s === 429, 'no se puede actualizar de nuevo a cada segundo');
   const ap3 = (await call(A, 'GET', '/api/admin/productos')).j.items.find((p) => p.sku === 'AB-AGOTADO');
   ok(ap3.stock === 3 && ap3.talca === 3 && ap3.bodega === 0, 'un traslado no cambia el total entre ambas sucursales (sigue siendo 3), solo su ubicación');
+
+  // ---- el vendedor modifica la cantidad de juegos del pedido de su cliente ----
+  const idA = pa.j.pedido.id, patchItems = (ck, id, items) => call(ck, 'PATCH', '/api/pedidos/' + id + '/items', { items });
+  ok((await patchItems(M1, idA, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 403, 'el cliente no puede modificar cantidades con esta vía');
+  ok((await patchItems(V2b, idA, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 404, 'un vendedor ajeno no puede modificar el pedido');
+  ok((await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: -1 }])).s === 400 && (await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 1.5 }])).s === 400 && (await patchItems(V1b, idA, [{ sku: 'NO-ESTA', qty: 1 }])).s === 400, 'cantidades inválidas o SKU que no está en el pedido: se rechazan');
+  const ov = await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 3 }]);
+  ok(ov.s === 409 && ov.j.problemas[0].max === 2 && ov.j.error.includes('hasta 2'), 'no deja pasar de lo que existe entre ambas sucursales (el pedido ya tiene 2 apartados y otro tiene 1: máximo 2)');
+  ok((await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 0 }])).s === 400, 'no deja el pedido sin productos (hay que rechazarlo)');
+  const ed = await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 1 }]);
+  ok(ed.s === 200 && ed.j.pedido.items[0].qty === 1 && ed.j.pedido.items[0].original === 2 && ed.j.pedido.total === 83300 && ed.j.pedido.juegos === 1 && ed.j.pedido.unidades === 4, 'el vendedor baja el pedido de 2 a 1 juego: total y unidades se recalculan y queda anotado que pedía 2');
+  const dvA = (await call(M1, 'GET', '/api/pedidos/' + idA)).j;
+  ok(dvA.pedido.items[0].original === 2 && dvA.pedido.eventos.length === 1 && dvA.pedido.eventos[0].texto.includes('de 2 juegos a 1 juego') && dvA.pedido.eventos[0].quien === 'Vendedor Uno', 'el cliente ve el cambio y quién lo hizo');
+  ok((await call(M1, 'GET', '/api/productos?q=AB-AGOTADO')).j.items[0].max === 1, 'al bajar el pedido se libera stock para otros clientes');
+  const vw = (await call(V1b, 'GET', '/api/pedidos/' + idA)).j;
+  ok(vw.whatsappCliente.startsWith('https://wa.me/56912345678?text=') && decodeURIComponent(vw.whatsappCliente).includes('antes 2') && vw.whatsapp === '', 'el vendedor tiene el enlace de WhatsApp para avisar al cliente del cambio');
+  ok((await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 2 }])).s === 200 && (await call(V1b, 'GET', '/api/pedidos/' + idA)).j.pedido.items[0].original === null, 'si vuelve a la cantidad original ya no figura como modificado');
+  ok((await patchItems(A, pb.j.pedido.id, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 400, 'sin cambios: se avisa');
+  await call(V1b, 'PATCH', '/api/pedidos/' + pb.j.pedido.id, { estado: 'confirmado' });
+  ok((await patchItems(V1b, pb.j.pedido.id, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 409, 'un pedido confirmado ya no se puede modificar');
 
   // ---- descarga del pedido en Excel ----
   const ExcelJS = require('exceljs');

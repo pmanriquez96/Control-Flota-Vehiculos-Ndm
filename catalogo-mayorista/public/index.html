@@ -284,8 +284,8 @@ function resumenHtml(o) {
   <span>Contacto</span><span>${esc(c.contacto_nombre)} · ${esc(c.whatsapp)}${c.telefono ? ' · ' + esc(c.telefono) : ''}</span><span>Correo facturas</span><span>${esc(c.email_fact)}</span><span>Vendedor</span><span>${esc((o.vendedor || {}).nombre)}</span></div>
   ${o.notas ? `<p><b>Observaciones:</b> ${esc(o.notas)}</p>` : ''}
   <h2 style="margin-top:14px">Detalle</h2><table><tr><th>SKU</th><th>Producto</th><th class="n">Juegos</th><th class="n hide-s">Precio juego</th><th class="n hide-s">Subtotal</th></tr>
-  ${o.items.map((i) => `<tr><td>${esc(i.sku)}</td><td>${esc(i.name)}</td><td class="n">${i.qty}</td><td class="n hide-s">${clp(i.precio)}</td><td class="n hide-s">${clp(i.subtotal)}</td></tr>`).join('')}
-  <tr><td colspan="2"><b>${o.juegos} juego${o.juegos > 1 ? 's' : ''}</b> <span class="mut">(${o.unidades} unidades)</span></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total IVA incl.</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table></div>`;
+  ${o.items.map((i) => `<tr><td>${esc(i.sku)}</td><td>${esc(i.name)}</td><td class="n">${i.qty}${i.original ? `<br><span class="mut" style="font-size:12px">pedía ${i.original}</span>` : ''}</td><td class="n hide-s">${clp(i.precio)}</td><td class="n hide-s">${clp(i.subtotal)}</td></tr>`).join('')}
+  <tr><td colspan="2"><b>${o.juegos} juego${o.juegos > 1 ? 's' : ''}</b> <span class="mut">(${o.unidades} unidades)</span></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total IVA incl.</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table>${(o.eventos || []).length ? `<h2 style="margin-top:14px">Cambios en el pedido</h2><ul style="margin:0;padding-left:20px">${o.eventos.map((e) => `<li>${esc(e.quien)} ${esc(e.texto)} <span class="mut">(${fdate(e.fecha)})</span></li>`).join('')}</ul>` : ''}</div>`;
 }
 const xlsxBtn = (id) => `<a class="btn sec sm right" href="/api/pedidos/${id}/excel" download>Descargar Excel</a>`;
 function vEnviado(r) {
@@ -318,17 +318,33 @@ function trasladoHtml(o) {
   if (!partes.length) partes.push(`<div class="msg o"><b>La cantidad necesaria ya está disponible en Talca.</b> Puedes terminar el pedido; Talca quedará con al menos ${t.minimo} de cada SKU.</div>`);
   return `<div class="card"><div class="flex"><h2 style="margin:0">Stock para este pedido</h2><button class="sec sm right" id="rs">Actualizar stock</button></div><div id="rsm"></div>${partes.join('')}<table><tr><th>SKU</th><th class="n">Pedido</th><th class="n">Talca</th><th class="n">Bodega Adic.</th><th class="n">Trasladar</th></tr>${t.lineas.map((l) => `<tr><td>${esc(l.sku)}<br><span class="mut">${esc(l.nombre)}</span></td><td class="n">${l.pedido}</td><td class="n">${l.talca}</td><td class="n">${l.bodega}</td><td class="n">${l.trasladar ? '<b>' + l.trasladar + '</b>' : '—'}${l.paraPedido && l.reserva ? `<br><span class="mut" style="font-size:12px">${l.paraPedido} + ${l.reserva} reserva</span>` : l.reserva ? '<br><span class="mut" style="font-size:12px">reserva</span>' : ''}${l.faltante ? `<br><span style="color:var(--mal);font-size:13px">faltan ${l.faltante}</span>` : ''}</td></tr>`).join('')}</table></div>`;
 }
+let FLASH = '';
 async function vPedido(id) {
   const r = await api('GET', '/api/pedidos/' + encodeURIComponent(id)), o = r.pedido, seller = ME.rol !== 'mayorista';
   let acc = '';
-  if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>
+  if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>${r.whatsappCliente || ['nuevo', 'revision'].includes(o.estado) ? `<div class="flex" style="margin-top:10px">${['nuevo', 'revision'].includes(o.estado) ? '<button class="sec" id="em">Modificar cantidades de juegos</button>' : ''}${r.whatsappCliente ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsappCliente)}">Avisar al cliente por WhatsApp</a>` : ''}</div>` : ''}<div id="ed"></div>
     <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p><div id="m"></div></div>`;
   else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
-  $('#app').innerHTML = `<div class="flex" style="margin:10px 0"><a href="#/pedidos">← Volver</a>${xlsxBtn(o.id)}</div>${acc}${trasladoHtml(o)}${resumenHtml(o)}`;
+  const flash = FLASH ? `<div class="msg o">${esc(FLASH)}</div>` : ''; FLASH = '';
+  $('#app').innerHTML = `<div class="flex" style="margin:10px 0"><a href="#/pedidos">← Volver</a>${xlsxBtn(o.id)}</div>${flash}${acc}${trasladoHtml(o)}${resumenHtml(o)}`;
   if ($('#rs')) $('#rs').onclick = async () => {
     const b = $('#rs'); b.disabled = true; b.textContent = 'Consultando Bsale…';
     try { await api('POST', '/api/stock/actualizar', { skus: o.items.map((i) => i.sku) }); vPedido(id); }
     catch (e) { b.disabled = false; b.textContent = 'Actualizar stock'; $('#rsm').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; }
+  };
+  if ($('#em')) $('#em').onclick = () => {
+    $('#ed').innerHTML = `<div class="msg i" style="margin-top:12px"><b>Modificar cantidades</b><p style="margin:4px 0 8px">Cambia los juegos de cada producto. Con <b>0</b> se quita el producto. No puede superar lo que existe entre Talca y Bodega Adicional.</p>
+      <table><tr><th>SKU / Producto</th><th class="n">Pide</th><th class="n">Nuevo</th></tr>${o.items.map((i) => `<tr><td><b>${esc(i.sku)}</b><br>${esc(i.name)}</td><td class="n">${i.qty}</td><td class="n"><input type="number" inputmode="numeric" min="0" value="${i.qty}" data-nq="${esc(i.sku)}" data-q0="${i.qty}" style="width:80px;text-align:center"></td></tr>`).join('')}</table>
+      <div class="flex" style="margin-top:10px"><button id="eg">Guardar cambios</button><button class="sec" id="ec">Cancelar</button></div><div id="em2"></div></div>`;
+    $('#ec').onclick = () => ($('#ed').innerHTML = '');
+    $('#eg').onclick = async () => {
+      const items = [...document.querySelectorAll('[data-nq]')].map((i) => ({ sku: i.dataset.nq, qty: Math.floor(Number(i.value)), q0: Number(i.dataset.q0) })).filter((x) => x.qty !== x.q0).map(({ sku, qty }) => ({ sku, qty }));
+      if (!items.length) { $('#em2').innerHTML = '<div class="msg e">No cambiaste ninguna cantidad</div>'; return; }
+      if (items.some((x) => !(x.qty >= 0))) { $('#em2').innerHTML = '<div class="msg e">Revisa las cantidades</div>'; return; }
+      const b = $('#eg'); b.disabled = true;
+      try { await api('PATCH', '/api/pedidos/' + o.id + '/items', { items }); FLASH = 'Cantidades actualizadas.' + (r.whatsappCliente ? ' Puedes avisar al cliente por WhatsApp.' : ''); vPedido(id); }
+      catch (e) { b.disabled = false; $('#em2').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; }
+    };
   };
   const upd = async (body) => { try { await api('PATCH', '/api/pedidos/' + o.id, body); vPedido(id); } catch (e) { $('#m').innerHTML = `<div class="msg e">${esc(e.message)}</div>`; } };
   document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => upd({ estado: b.dataset.st })));

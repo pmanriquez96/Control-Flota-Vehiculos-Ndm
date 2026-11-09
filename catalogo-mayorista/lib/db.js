@@ -72,7 +72,15 @@ CREATE TABLE IF NOT EXISTS order_items (
   sku text NOT NULL,
   name text NOT NULL,
   qty int NOT NULL,
-  price double precision NOT NULL DEFAULT 0
+  price double precision NOT NULL DEFAULT 0,
+  qty_orig int
+);
+CREATE TABLE IF NOT EXISTS order_events (
+  id serial PRIMARY KEY,
+  order_id int NOT NULL,
+  who text NOT NULL,
+  text text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS kv (
   k text PRIMARY KEY,
@@ -83,6 +91,7 @@ CREATE TABLE IF NOT EXISTS kv (
 const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_talca int NOT NULL DEFAULT 0',
   'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_bodega int NOT NULL DEFAULT 0',
+  'ALTER TABLE order_items ADD COLUMN IF NOT EXISTS qty_orig int',
 ];
 async function init(pool) {
   await pool.query(SCHEMA);
