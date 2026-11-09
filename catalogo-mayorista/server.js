@@ -239,11 +239,12 @@ function createApp(pool, opts = {}) {
     const pend = orders.filter((o) => PENDIENTES.includes(o.estado));
     const skus = [...new Set(pend.flatMap((o) => o.items.map((i) => i.sku)))];
     if (!skus.length) return orders;
-    const rows = (await q(`SELECT sku,stock_talca,stock_bodega FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows;
+    const rows = (await q(`SELECT sku,stock,stock_talca,stock_bodega FROM products WHERE sku IN (${skus.map((_, i) => '$' + (i + 1)).join(',')})`, skus)).rows;
     const st = new Map(rows.map((r) => [r.sku, r]));
+    const resv = await reservedMap();
     pend.forEach((o) => {
       const lineas = o.items.map((i) => {
-        const s = st.get(i.sku) || { stock_talca: 0, stock_bodega: 0 };
+        const s = st.get(i.sku) || { stock: 0, stock_talca: 0, stock_bodega: 0 };
         // Talca debe poder atender el pedido y quedar con al menos MIN_TALCA de ese SKU
         const paraPedido = Math.max(0, i.qty - s.stock_talca);
         const necesario = Math.max(0, i.qty + MIN_TALCA - s.stock_talca);
@@ -251,6 +252,8 @@ function createApp(pool, opts = {}) {
         const movPedido = Math.min(paraPedido, s.stock_bodega);
         return {
           sku: i.sku, nombre: i.name, pedido: i.qty, talca: s.stock_talca, bodega: s.stock_bodega,
+          stockTotal: s.stock,                                                   // lo que hay entre ambas sucursales
+          maximo: Math.max(0, s.stock - ((resv.get(i.sku) || 0) - i.qty)),      // hasta cuántos juegos puede tener ESTE pedido (sin contar lo apartado por otros)
           paraPedido: movPedido, reserva: mover - movPedido, trasladar: mover,
           faltante: paraPedido - movPedido,                       // el pedido no se puede atender con lo que hay
           faltanteReserva: (necesario - paraPedido) - (mover - movPedido), // Bodega no alcanza para dejar el mínimo en Talca

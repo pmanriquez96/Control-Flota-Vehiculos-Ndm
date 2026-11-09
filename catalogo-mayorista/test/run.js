@@ -256,6 +256,7 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const dA = (await call(V1b, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido;
   const dl = dA.traslado.lineas[0];
   ok(dA.traslado.total === 3 && dA.traslado.faltante === 0 && dA.traslado.faltanteReserva === 0 && dl.talca === 0 && dl.bodega === 3 && dl.paraPedido === 2 && dl.reserva === 1 && dl.trasladar === 3, 'el pedido avisa cuánto trasladar: pide 2 + 1 de reserva en Talca (Talca 0) = 3 desde Bodega Adicional');
+  ok(dl.stockTotal === 3 && dl.maximo === 3, 'el pedido informa el stock total entre ambas sucursales (3) y hasta cuántos juegos puede tener (3: nadie más tiene apartado)');
   ok((await call(M1, 'GET', '/api/pedidos/' + pa.j.pedido.id)).j.pedido.traslado === undefined, 'el cliente no ve el aviso de traslado');
   const lista = (await call(V1b, 'GET', '/api/pedidos')).j.items.find((o) => o.id === pa.j.pedido.id);
   ok(lista.traslado.total === 3, 'la lista de pedidos también marca el traslado');
@@ -299,6 +300,8 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok((await patchItems(M1, idA, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 403, 'el cliente no puede modificar cantidades con esta vía');
   ok((await patchItems(V2b, idA, [{ sku: 'AB-AGOTADO', qty: 1 }])).s === 404, 'un vendedor ajeno no puede modificar el pedido');
   ok((await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: -1 }])).s === 400 && (await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 1.5 }])).s === 400 && (await patchItems(V1b, idA, [{ sku: 'NO-ESTA', qty: 1 }])).s === 400, 'cantidades inválidas o SKU que no está en el pedido: se rechazan');
+  const lv = (await call(V1b, 'GET', '/api/pedidos/' + idA)).j.pedido.traslado.lineas[0];
+  ok(lv.stockTotal === 3 && lv.maximo === 2, 'con otro pedido que aparta 1, este puede llegar hasta 2 de un total de 3');
   const ov = await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 3 }]);
   ok(ov.s === 409 && ov.j.problemas[0].max === 2 && ov.j.error.includes('hasta 2'), 'no deja pasar de lo que existe entre ambas sucursales (el pedido ya tiene 2 apartados y otro tiene 1: máximo 2)');
   ok((await patchItems(V1b, idA, [{ sku: 'AB-AGOTADO', qty: 0 }])).s === 400, 'no deja el pedido sin productos (hay que rechazarlo)');
