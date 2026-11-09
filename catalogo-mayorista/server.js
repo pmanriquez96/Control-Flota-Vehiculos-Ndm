@@ -157,8 +157,7 @@ function createApp(pool, opts = {}) {
   }));
 
   // Foto de Drive (solo las que están en el catálogo y con sesión iniciada), guardada en disco para no llamar a Google cada vez
-  app.get('/api/foto/:id', loadUser, wrap(async (req, res) => {
-    const id = String(req.params.id);
+  async function sendFoto(res, id) {
     if (!/^[A-Za-z0-9_-]{10,100}$/.test(id)) return res.status(404).end();
     if (!(await q('SELECT 1 FROM photos WHERE file_id=$1', [id])).rows[0]) return res.status(404).end();
     const file = path.join(cacheDir, id);
@@ -172,6 +171,15 @@ function createApp(pool, opts = {}) {
     res.setHeader('Content-Type', type);
     res.setHeader('Cache-Control', 'private, max-age=86400');
     res.send(buf);
+  }
+  app.get('/api/foto/:id', loadUser, wrap(async (req, res) => sendFoto(res, String(req.params.id))));
+  // Foto por SKU (n = 0, 1 o 2): sirve para el carrito, que guarda solo el SKU y no el id del archivo
+  app.get('/api/foto/sku/:sku/:n', loadUser, wrap(async (req, res) => {
+    const n = parseInt(req.params.n, 10);
+    if (!(n >= 0 && n <= 2)) return res.status(404).end();
+    const r = (await q('SELECT file_id FROM photos WHERE sku=$1 AND pos=$2', [String(req.params.sku).toUpperCase(), n])).rows[0];
+    if (!r) return res.status(404).end();
+    return sendFoto(res, r.file_id);
   }));
 
   /* ---------- pedidos ---------- */

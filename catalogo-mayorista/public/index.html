@@ -42,6 +42,8 @@ button.sm{padding:6px 10px;font-size:14px}.right{margin-left:auto}.flex{display:
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:thin}
 .chip{background:var(--soft);color:var(--az);padding:7px 13px;border-radius:20px;white-space:nowrap;font-size:15px}.chip i{font-style:normal;opacity:.7;font-size:12px;margin-left:3px}.chip.on{background:var(--az);color:#fff}
 .aro-h{font-size:19px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--az2);color:var(--az);display:flex;align-items:baseline;gap:10px}.aro-h small{font-size:13px;color:var(--mut);font-weight:400}
+.cth{display:flex;gap:12px;align-items:flex-start}.thumb{flex:0 0 84px;width:84px;aspect-ratio:4/3;border:1px solid var(--bd);border-radius:8px;background:#fff;overflow:hidden;display:grid;place-items:center}.thumb img{width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block}.thumb.none::after{content:'Sin foto';font-size:11px;color:var(--mut)}
+@media(max-width:560px){.thumb{flex-basis:64px;width:64px}.cth{gap:8px}}
 .stk{display:flex;gap:6px;flex-wrap:wrap}.stk em{font-style:normal;font-size:13px;border-radius:6px;padding:3px 8px;background:var(--soft);color:var(--azd)}.stk em.z{background:#fff2d6;color:#8a5a00}.stk em b{font-weight:700}
 .tag.tras{background:#fff2d6;color:#8a5a00;margin-left:6px}.tag.falta{background:#fde5e2;color:#9b2a1e;margin-left:6px}
 .specs{display:flex;gap:5px;flex-wrap:wrap}.specs em{font-style:normal;font-size:12px;background:var(--soft);color:var(--azd);border-radius:6px;padding:2px 7px}
@@ -237,16 +239,22 @@ async function vCatalogo() {
 }
 
 /* ---- carrito y envío del pedido ---- */
+const fotoUrl = (sku) => '/api/foto/sku/' + encodeURIComponent(sku) + '/0';
 function vCarrito() {
   const c = cartGet(), skus = Object.keys(c);
   if (!skus.length) { $('#app').innerHTML = '<h1>Carrito</h1><div class="card mut">Aún no agregas productos. <a href="#/">Ir al catálogo</a></div>'; return; }
   const total = skus.reduce((s, k) => s + c[k].qty * c[k].precio, 0);
   $('#app').innerHTML = `<h1>Carrito</h1><div class="card"><table><tr><th>SKU / Producto</th><th class="n">Juegos</th><th class="n hide-s">Subtotal</th><th></th></tr>
-  ${skus.map((k) => `<tr><td><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} por juego de ${ME.juego} · IVA incl.</span></td><td class="n"><input type="number" inputmode="numeric" min="1" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
+  ${skus.map((k) => `<tr><td><div class="cth"><span class="thumb"><img src="${esc(fotoUrl(k))}" alt="${esc(c[k].nombre)}" loading="lazy"></span><span><b>${esc(k)}</b><br>${esc(c[k].nombre)}<br><span class="mut">${clp(c[k].precio)} por juego de ${ME.juego} · IVA incl.</span></span></div></td><td class="n"><input type="number" inputmode="numeric" min="1" value="${c[k].qty}" data-q="${esc(k)}" style="width:76px;text-align:center"></td><td class="n hide-s">${clp(c[k].qty * c[k].precio)}</td><td class="n"><button class="sec sm" data-del="${esc(k)}" aria-label="Quitar">✕</button></td></tr>`).join('')}
   <tr><td colspan="2" class="n"><b>Total referencial (IVA incluido)</b></td><td class="n hide-s"><b>${clp(total)}</b></td><td></td></tr></table>
   <p class="mut" style="font-size:14px">Es un pedido previo: tu vendedor ${ME.vendedor ? '<b>' + esc(ME.vendedor.nombre) + '</b> ' : ''}lo revisa y lo confirma. Precios y disponibilidad pueden variar hasta entonces.</p>
   <label>Observaciones para tu vendedor (opcional)</label><textarea id="nt" rows="2" maxlength="500"></textarea><div id="m"></div>
   <div class="flex" style="margin-top:12px"><button id="send">Enviar pedido</button><button class="sec" id="clr">Vaciar</button></div></div>`;
+  // foto de muestra: si no hay, se deja un cuadro «Sin foto»; al tocarla se agranda
+  document.querySelectorAll('.thumb img').forEach((im) => {
+    im.onerror = () => { im.parentNode.classList.add('none'); im.remove(); };
+    im.onclick = () => { const z = document.createElement('div'); z.className = 'zoom'; z.innerHTML = `<img src="${esc(im.src)}" alt="">`; z.onclick = () => z.remove(); document.body.appendChild(z); };
+  });
   document.querySelectorAll('[data-q]').forEach((i) => (i.onchange = () => {
     const k = i.dataset.q, n = Math.floor(Number(i.value)); if (n >= 1) c[k].qty = Math.min(n, c[k].max); cartSet(c); chrome(); vCarrito();
   }));

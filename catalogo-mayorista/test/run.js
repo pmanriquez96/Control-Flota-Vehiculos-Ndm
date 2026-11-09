@@ -179,6 +179,9 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   ok(foto.s === 200 && foto.ct.includes('image/jpeg'), 'sirve la foto desde Drive (con sesión)');
   ok((await call('', 'GET', p205.fotos[0])).s === 401 && (await call(M1, 'GET', '/api/foto/archivoQueNoExiste1')).s === 404, 'foto sin sesión o fuera del catálogo: no');
 
+  const fsk = await call(M1, 'GET', '/api/foto/sku/ab-205/0');
+  ok(fsk.s === 200 && fsk.ct.includes('image/jpeg'), 'el carrito puede pedir la foto de un SKU (sin conocer el id del archivo)');
+  ok((await call(M1, 'GET', '/api/foto/sku/AB-AGOTADO/0')).s === 404 && (await call(M1, 'GET', '/api/foto/sku/AB-205/7')).s === 404 && (await call('', 'GET', '/api/foto/sku/AB-205/0')).s === 401, 'sin foto, índice fuera de rango o sin sesión: no');
   // pedidos
   const ped = (items, notas) => call(M1, 'POST', '/api/pedidos', { items, notas });
   ok((await ped([])).s === 400 && (await ped([{ sku: 'AB-205', qty: 0 }])).s === 400 && (await ped([{ sku: 'AB-205', qty: 1.5 }])).s === 400, 'pedido vacío o con cantidades raras se rechaza');
