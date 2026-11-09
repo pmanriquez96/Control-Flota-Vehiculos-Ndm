@@ -9,6 +9,7 @@ const { makeDrive, makePublicDrive, parseFolderId, loadCredentials } = require('
 const { runSync, getKv, setKv, state: syncState } = require('./lib/sync');
 const { cleanProfile, REGIONES } = require('./lib/profile');
 const { emailOk, waNumber, matches, clp } = require('./lib/util');
+const { buildOrderXlsx } = require('./lib/excel');
 
 const ROLES = ['admin', 'vendedor', 'mayorista'];
 const ESTADOS = ['nuevo', 'revision', 'confirmado', 'rechazado', 'cancelado'];
@@ -205,8 +206,11 @@ function createApp(pool, opts = {}) {
   async function ordersFor(u, extraSql, extraParams) {
     const sc = scope(u);
     const params = sc.params.concat(extraParams || []);
+    const conds = [];
+    if (sc.sql !== 'true') conds.push(sc.sql);
+    if (extraSql) conds.push(extraSql.replace(/\$(\d+)/g, (m, n) => '$' + (Number(n) + sc.params.length)));
     const rows = (await q(`SELECT o.*, s.name AS seller_name, s.phone AS seller_phone FROM orders o LEFT JOIN users s ON s.id=o.seller_id
-                           WHERE ${sc.sql}${extraSql ? ' AND ' + extraSql.replace(/\$(\d+)/g, (m, n) => '$' + (Number(n) + sc.params.length)) : ''} ORDER BY o.id DESC LIMIT 300`, params)).rows;
+                           ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''} ORDER BY o.id DESC LIMIT 300`, params)).rows;
     if (!rows.length) return [];
     const its = (await q(`SELECT order_id,sku,name,qty,price FROM order_items WHERE order_id IN (${rows.map((_, i) => '$' + (i + 1)).join(',')}) ORDER BY id`, rows.map((r) => r.id))).rows;
     return rows.map((o) => shape(o, its.filter((i) => i.order_id === o.id)));
@@ -304,6 +308,16 @@ function createApp(pool, opts = {}) {
     if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
     const seller = { name: l[0].vendedor.nombre, phone: l[0].vendedor.telefono };
     res.json({ pedido: l[0], whatsapp: req.user.role === 'mayorista' ? waLink(l[0], seller) : '' });
+  }));
+  // Descarga del pedido en Excel (cada rol solo puede bajar los que ve)
+  app.get('/api/pedidos/:id/excel', loadUser, gate, wrap(async (req, res) => {
+    const l = await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]);
+    if (!l[0]) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const buf = await buildOrderXlsx(l[0], { empresa, juego: JUEGO });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Pedido-${l[0].codigo}.xlsx"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(buf);
   }));
   app.patch('/api/pedidos/:id', loadUser, gate, only('admin', 'vendedor'), wrap(async (req, res) => {
     const l = await ordersFor(req.user, 'o.id=$1', [parseInt(req.params.id, 10) || 0]);

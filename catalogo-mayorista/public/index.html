@@ -279,11 +279,12 @@ function resumenHtml(o) {
   ${o.items.map((i) => `<tr><td>${esc(i.sku)}</td><td>${esc(i.name)}</td><td class="n">${i.qty}</td><td class="n hide-s">${clp(i.precio)}</td><td class="n hide-s">${clp(i.subtotal)}</td></tr>`).join('')}
   <tr><td colspan="2"><b>${o.juegos} juego${o.juegos > 1 ? 's' : ''}</b> <span class="mut">(${o.unidades} unidades)</span></td><td class="n" colspan="1"></td><td class="n hide-s"><b>Total IVA incl.</b></td><td class="n hide-s"><b>${clp(o.total)}</b></td></tr></table></div>`;
 }
+const xlsxBtn = (id) => `<a class="btn sec sm right" href="/api/pedidos/${id}/excel" download>Descargar Excel</a>`;
 function vEnviado(r) {
   const wa = r.whatsapp;
   $('#app').innerHTML = `<div class="msg o big">¡Pedido ${esc(r.pedido.codigo)} enviado!</div>
   <div class="card"><p>Tu vendedor lo verá en su panel. Si quieres, avísale ahora mismo por WhatsApp para que lo atienda más rápido.</p>
-  <div class="flex">${wa ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(wa)}">Avisar por WhatsApp a mi vendedor</a>` : '<span class="mut">Tu vendedor no tiene WhatsApp registrado.</span>'}<a class="btn sec" href="#/pedidos">Ver mis pedidos</a><a class="btn sec" href="#/">Seguir comprando</a></div></div>${resumenHtml(r.pedido)}`;
+  <div class="flex">${wa ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(wa)}">Avisar por WhatsApp a mi vendedor</a>` : '<span class="mut">Tu vendedor no tiene WhatsApp registrado.</span>'}<a class="btn sec" href="/api/pedidos/${r.pedido.id}/excel" download>Descargar Excel</a><a class="btn sec" href="#/pedidos">Ver mis pedidos</a><a class="btn sec" href="#/">Seguir comprando</a></div></div>${resumenHtml(r.pedido)}`;
 }
 
 /* ---- pedidos ---- */
@@ -315,7 +316,7 @@ async function vPedido(id) {
   if (seller) acc = `<div class="card"><h2>Gestión</h2><div class="flex"><button class="sec" data-st="revision">Marcar en revisión</button><button data-st="confirmado" style="background:var(--ok)">Confirmar</button><button class="mal" data-st="rechazado">Rechazar</button></div>
     <label>Nota interna (solo la ven vendedores y administradores)</label><textarea id="ni" rows="2" maxlength="500">${esc(o.notaInterna)}</textarea><p><button class="sec sm" id="sn">Guardar nota</button></p><div id="m"></div></div>`;
   else acc = `<div class="flex" style="margin-bottom:12px">${r.whatsapp ? `<a class="btn wa" target="_blank" rel="noopener" href="${esc(r.whatsapp)}">Avisar por WhatsApp a mi vendedor</a>` : ''}${o.estado === 'nuevo' ? '<button class="mal" id="cx">Cancelar pedido</button>' : ''}</div><div id="m"></div>`;
-  $('#app').innerHTML = `<p><a href="#/pedidos">← Volver</a></p>${acc}${trasladoHtml(o)}${resumenHtml(o)}`;
+  $('#app').innerHTML = `<div class="flex" style="margin:10px 0"><a href="#/pedidos">← Volver</a>${xlsxBtn(o.id)}</div>${acc}${trasladoHtml(o)}${resumenHtml(o)}`;
   if ($('#rs')) $('#rs').onclick = async () => {
     const b = $('#rs'); b.disabled = true; b.textContent = 'Consultando Bsale…';
     try { await api('POST', '/api/stock/actualizar', { skus: o.items.map((i) => i.sku) }); vPedido(id); }

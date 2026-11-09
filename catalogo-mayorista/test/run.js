@@ -291,6 +291,22 @@ const PERFIL = { razon_social: 'Neumáticos Sur SpA', rut: '76.086.428-5', giro:
   const ap3 = (await call(A, 'GET', '/api/admin/productos')).j.items.find((p) => p.sku === 'AB-AGOTADO');
   ok(ap3.stock === 3 && ap3.talca === 3 && ap3.bodega === 0, 'un traslado no cambia el total entre ambas sucursales (sigue siendo 3), solo su ubicación');
 
+  // ---- descarga del pedido en Excel ----
+  const ExcelJS = require('exceljs');
+  const getBin = async (cookie, url) => { const r = await fetch(base + url, { headers: { cookie: cookie || '' } }); return { s: r.status, ct: r.headers.get('content-type') || '', cd: r.headers.get('content-disposition') || '', buf: Buffer.from(await r.arrayBuffer()) }; };
+  const x1 = await getBin(M1, '/api/pedidos/' + o1.j.pedido.id + '/excel');
+  ok(x1.s === 200 && x1.ct.includes('spreadsheetml') && x1.cd.includes('Pedido-P-00001.xlsx') && x1.buf.slice(0, 2).toString() === 'PK', 'el cliente descarga su pedido como archivo .xlsx');
+  const wbx = new ExcelJS.Workbook(); await wbx.xlsx.load(x1.buf);
+  const wsx = wbx.getWorksheet('Pedido'); const cells = []; wsx.eachRow((r) => r.eachCell((c) => cells.push(c.value && c.value.result !== undefined ? c.value.result : c.value)));
+  ok(cells.includes('AB-205') && cells.includes('AB-265') && cells.includes('Neumáticos Sur SpA') && cells.includes('76.086.428-5'), 'el Excel trae SKU, productos y datos del cliente');
+  const hdr = []; wsx.eachRow((r) => { if (r.getCell(1).value === 'SKU') hdr.push(r.number); });
+  const rowA = wsx.getRow(hdr[0] + 1), rowT = wsx.getRow(hdr[0] + 3);
+  ok(rowA.getCell(3).value === 5 && rowA.getCell(4).value.result === 20 && rowA.getCell(5).value === 59500 && rowA.getCell(6).value.result === 297500 && rowA.getCell(6).value.formula.startsWith('C'), 'cantidades en juegos y unidades, precio por juego y subtotal con fórmula');
+  ok(rowT.getCell(3).value.result === 7 && rowT.getCell(4).value.result === 28 && rowT.getCell(6).value.result === 5 * 59500 + 2 * 95200 && rowT.getCell(6).value.formula.startsWith('SUM'), 'totales de juegos, unidades y valor (IVA incluido)');
+  ok((await getBin(V1b, '/api/pedidos/' + o1.j.pedido.id + '/excel')).s === 200 && (await getBin(A, '/api/pedidos/' + o1.j.pedido.id + '/excel')).s === 200, 'su vendedor y el administrador también lo descargan');
+  ok((await getBin(V2b, '/api/pedidos/' + o1.j.pedido.id + '/excel')).s === 404, 'un vendedor ajeno no puede bajarlo');
+  ok((await getBin('', '/api/pedidos/' + o1.j.pedido.id + '/excel')).s === 401, 'sin sesión no se descarga');
+
   // ---- fotos desde un enlace de carpeta pública (sin cuenta de servicio) ----
   ok((await call(A, 'GET', '/api/admin/drive')).j.modo === 'cuenta', 'al inicio las fotos vienen de la cuenta de servicio');
   ok((await call(V1b, 'POST', '/api/admin/drive', { enlace: 'x' })).s === 403, 'solo el administrador cambia la carpeta de fotos');

@@ -13,6 +13,7 @@ Proyecto independiente (vive en esta carpeta para poder moverlo a su propio repo
   - *Mayorista*: en su primer ingreso cambia la clave y completa facturación, contacto y despacho (RUT validado). Queda guardado y lo puede corregir en «Mis datos». Está asociado a **un vendedor**.
   - *Vendedor*: ve y gestiona (en revisión / confirmar / rechazar, nota interna) **solo** los pedidos de sus clientes.
   - *Administrador*: ve todo, crea usuarios, reasigna vendedores, oculta productos, ve el stock real y fuerza la sincronización.
+- **Pedido en Excel.** Cada pedido se puede bajar como archivo `.xlsx` (botón «Descargar Excel» en el detalle y al enviarlo): datos del cliente, vendedor, estado, y por SKU los juegos, unidades, precio por juego y subtotal (IVA incluido) con fórmulas y totales. Cada rol solo baja los pedidos que puede ver (`GET /api/pedidos/:id/excel`; usa la librería `exceljs`).
 - **Pedido previo.** Carrito → «Enviar pedido» → resumen con SKU, nombre, cantidad y datos del cliente. Al terminar, el cliente decide si avisa a su vendedor por **WhatsApp** (botón que abre `wa.me` con el resumen ya escrito). El vendedor además ve el pedido (con contador de nuevos) en su panel.
 
 ## Variables de entorno
